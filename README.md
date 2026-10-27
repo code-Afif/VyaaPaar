@@ -84,25 +84,19 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_anon_key_here
 
 ---
 
-## 🧭 Two-Factor Authentication (MFA) & Demo Mode
+## 🧭 Authentication & Demo Mode
 
 ### 1. Seamless Demo Mode (Active by default)
 - If Supabase environment variables are unconfigured or absent, the application launches directly into **Demo Mode** using realistic pre-seeded data for *Sharma General Store*.
 - Judges and evaluators can test every feature (Khata ledger, customer balance calculations, Paytm QR payment reconciliation, and inventory tracking) without configuring an external database.
 
-### 2. Password-First, Email OTP Second Architecture
-DukaanSaathi secures merchant store records using a strict **two-step authentication flow**:
-- **Step A (Credentials Verification):** Traditional email and password authentication using `supabase.auth.signInWithPassword()`. If invalid, generic credential errors are returned and no OTP is ever generated. New merchants register with their store and owner details.
-- **Step B (Email OTP Second Factor):** Triggered only upon valid password authentication. The trusted Supabase Edge Function (`mfa-auth`) generates a cryptographically secure 6-digit OTP, stores its SHA-256 hash in `mfa_challenges`, and dispatches it via a configured email provider.
-- **Step C (Session-Bound Verification):** The OTP is verified server-side via `verify_mfa_challenge`. Successful verification creates an active record in `mfa_verification_sessions` bound strictly to the caller's JWT `session_id`.
-- **Row-Level Security (RLS) Shield:** All 5 merchant tables (`merchants`, `customers`, `ledger_entries`, `payment_events`, `products`) evaluate `public.is_mfa_verified()`, denying all access until second-factor verification completes for that specific session.
-
-### 3. Expiration, Abuse Prevention & Security Guarantees
-- **OTP Expiration:** OTP challenges expire after **1 hour** on the server.
-- **Attempt Lockout:** Server-enforced maximum of **5 verification attempts** before an OTP challenge is permanently locked.
-- **Resend Cooldown:** Server-side and client-side **60-second cooldown** between challenge requests.
-- **Single-Use:** Challenges are marked `consumed_at` immediately upon successful verification to prevent replay attacks.
-- **Fail-Closed Execution:** If the Edge Function or email provider is unavailable, verification fails closed with an explicit error. OTP codes are never exposed in responses or logs.
+### 2. Password-Only Supabase Authentication Flow
+DukaanSaathi secures merchant store records using streamlined, industry-standard Supabase password authentication:
+- **Sign In (`supabase.auth.signInWithPassword`):** Merchants authenticate with email and password. Upon successful verification, the app immediately loads the merchant profile and redirects directly to the store dashboard.
+- **Sign Up (`supabase.auth.signUp`):** New merchants register their account along with store name, proprietor name, and contact details. If email confirmation is enabled, merchants are guided to verify their email before sign-in.
+- **Sign Out (`supabase.auth.signOut`):** Clears the authenticated session and gracefully returns to offline Demo Mode.
+- **Session Persistence:** Active Supabase sessions are automatically restored on launch via `supabase.auth.getSession()`, with realtime auth state listeners (`supabase.auth.onAuthStateChange`).
+- **Row-Level Security (RLS) Shield:** All 5 merchant tables (`merchants`, `customers`, `ledger_entries`, `payment_events`, `products`) enforce multi-tenant isolation via `auth.uid() = id` or `merchant_id = auth.uid()`. Unauthenticated anonymous access is strictly blocked at the database level.
 
 ---
 

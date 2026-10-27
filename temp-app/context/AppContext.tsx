@@ -46,7 +46,7 @@ interface AppContextType {
   userEmail: string | null;
   setDemoMode: (isDemo: boolean) => void;
   signOut: () => Promise<void>;
-  completeMfaLogin: (userId: string, metadata?: any) => Promise<void>;
+  completeLogin: (userId: string, metadata?: any) => Promise<void>;
   seedCurrentSupabaseAccount: () => Promise<boolean>;
   addCustomer: (
     name: string,
@@ -96,7 +96,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>(SEED_PAYMENT_EVENTS);
   const [inventory, setInventory] = useState<InventoryItem[]>(SEED_INVENTORY);
 
-  // Restore authenticated session on launch with strict MFA validation
+  // Restore authenticated session on launch
   useEffect(() => {
     let isMounted = true;
 
@@ -109,18 +109,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         const { data } = await supabase.auth.getSession();
         if (data.session && isMounted) {
-          // Check if session has verified second-factor MFA in database
-          const isMfaActive = await supabaseService.checkMfaStatus();
-          if (isMfaActive && isMounted) {
-            setIsAuthenticated(true);
-            setUserEmail(data.session.user.email || null);
-            setIsDemoMode(false);
-            await loadSupabaseData(data.session.user.id, data.session.user.user_metadata);
-          } else {
-            // Unverified or expired MFA session: Do NOT grant merchant access
-            setIsAuthenticated(false);
-            setUserEmail(data.session.user.email || null);
-          }
+          setIsAuthenticated(true);
+          setUserEmail(data.session.user.email || null);
+          setIsDemoMode(false);
+          await loadSupabaseData(data.session.user.id, data.session.user.user_metadata);
         }
       } catch (err) {
         console.warn('Session restoration failed:', err);
@@ -136,14 +128,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       async (event, session) => {
         if (session) {
           setUserEmail(session.user.email || null);
-          const isMfaActive = await supabaseService.checkMfaStatus();
-          if (isMfaActive) {
-            setIsAuthenticated(true);
-            setIsDemoMode(false);
-            await loadSupabaseData(session.user.id, session.user.user_metadata);
-          } else {
-            setIsAuthenticated(false);
-          }
+          setIsAuthenticated(true);
+          setIsDemoMode(false);
+          await loadSupabaseData(session.user.id, session.user.user_metadata);
         } else {
           setIsAuthenticated(false);
           setUserEmail(null);
@@ -188,7 +175,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const completeMfaLogin = async (userId: string, metadata?: any) => {
+  const completeLogin = async (userId: string, metadata?: any) => {
     setIsAuthenticated(true);
     setIsDemoMode(false);
     await loadSupabaseData(userId, metadata);
@@ -235,7 +222,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const signOut = async () => {
     if (isSupabaseConfigured()) {
-      await supabaseService.revokeMfaSession();
       await supabase.auth.signOut();
     }
     setIsAuthenticated(false);
@@ -518,7 +504,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         userEmail,
         setDemoMode,
         signOut,
-        completeMfaLogin,
+        completeLogin,
         seedCurrentSupabaseAccount,
         addCustomer,
         recordCreditSale,

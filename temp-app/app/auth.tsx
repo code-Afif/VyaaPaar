@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   ScrollView,
   Platform,
@@ -17,17 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { supabaseService } from '@/services/supabaseService';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const { completeMfaLogin, setDemoMode, signOut } = useApp();
+  const { completeLogin, setDemoMode } = useApp();
 
-  // Authentication flow states
+  // Authentication mode
   const [mode, setMode] = useState<'SIGN_IN' | 'SIGN_UP'>('SIGN_IN');
-  const [step, setStep] = useState<'CREDENTIALS' | 'OTP_VERIFICATION'>('CREDENTIALS');
 
-  // Step A: Credentials inputs
+  // Credentials inputs
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -37,43 +34,14 @@ export default function AuthScreen() {
   const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
 
-  // Step B: OTP inputs and challenge tracking
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const otpInputRefs = useRef<any[]>([]);
-  const [challengeId, setChallengeId] = useState<string>('');
-  const [maskedEmail, setMaskedEmail] = useState<string>('');
-  const [resendCooldown, setResendCooldown] = useState<number>(0);
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number>(5);
-
   // Status tracking
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // 60-second cooldown timer countdown
-  useEffect(() => {
-    let timer: any = null;
-    if (resendCooldown > 0) {
-      timer = setInterval(() => {
-        setResendCooldown((prev) => (prev > 1 ? prev - 1 : 0));
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [resendCooldown]);
-
-  // Helper: Mask email if backend doesn't provide masked string
-  const getMaskedEmail = (rawEmail: string): string => {
-    if (!rawEmail || !rawEmail.includes('@')) return rawEmail;
-    const [name, domain] = rawEmail.split('@');
-    if (name.length <= 2) return `${name.charAt(0)}***@${domain}`;
-    return `${name.charAt(0)}***${name.charAt(name.length - 1)}@${domain}`;
-  };
-
   /**
-   * STEP A: Handle Email + Password Submission
-   * Enforces password-first verification before ANY OTP challenge is created.
+   * Handle Email + Password Submission
+   * Pure password-only authentication flow using Supabase Auth
    */
   const handleCredentialsSubmit = async () => {
     setErrorMessage(null);
@@ -112,21 +80,23 @@ export default function AuthScreen() {
 
     try {
       if (mode === 'SIGN_IN') {
-        // Authenticate with email + password first
+        // Authenticate with email + password directly
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
           password: cleanPassword,
         });
 
         if (error || !data.session) {
-          // Security requirement: generic invalid credential message; never trigger OTP on failed password
-          setErrorMessage('Invalid email or password (Email ya Password galat hai).');
+          setErrorMessage(error?.message || 'Invalid email or password (Email ya Password galat hai).');
           setIsLoading(false);
           return;
         }
 
-        // Password verified. Now request MFA challenge from Edge Function
-        await initiateMfaChallenge(data.session.user.email || cleanEmail);
+        // Authenticated successfully! Load merchant data and navigate directly to dashboard
+        setSuccessMessage('Logged in successfully! Opening store...');
+        await completeLogin(data.session.user.id, data.session.user.user_metadata);
+        setIsLoading(false);
+        router.replace('/(tabs)');
       } else {
         // Sign up new merchant
         const { data, error } = await supabase.auth.signUp({
@@ -148,11 +118,14 @@ export default function AuthScreen() {
         }
 
         if (data.session) {
-          // Session directly available, proceed to MFA
-          await initiateMfaChallenge(cleanEmail);
+          // Session directly available, log in immediately
+          setSuccessMessage('Account created successfully! Opening store...');
+          await completeLogin(data.session.user.id, data.session.user.user_metadata);
+          setIsLoading(false);
+          router.replace('/(tabs)');
         } else {
           setSuccessMessage(
-            'Account created! If email confirmation is enabled, please verify your email then sign in.'
+            'Account created! If email confirmation is enabled on your Supabase project, please check your inbox and verify before signing in.'
           );
           setMode('SIGN_IN');
           setIsLoading(false);
@@ -162,177 +135,6 @@ export default function AuthScreen() {
       setErrorMessage(err.message || 'Authentication error occurred.');
       setIsLoading(false);
     }
-  };
-
-  /**
-   * Request second factor OTP challenge from server
-   * Fails closed if Edge Function or email provider is unavailable.
-   */
-  const initiateMfaChallenge = async (userEmailAddr: string) => {
-    try {
-      const challenge = await supabaseService.requestMfaChallenge();
-      setChallengeId(challenge.challengeId);
-      setMaskedEmail(challenge.maskedEmail || getMaskedEmail(userEmailAddr));
-      setResendCooldown(60);
-      setAttemptsRemaining(5);
-      setOtpDigits(['', '', '', '', '', '']);
-      setStep('OTP_VERIFICATION');
-      setSuccessMessage('Security OTP has been sent to your email (Suraksha OTP bhej diya gaya hai).');
-      setIsLoading(false);
-
-      // Auto-focus first digit on next tick
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 300);
-    } catch (err: any) {
-      // Security fail-closed: do NOT allow entry if MFA service fails
-      console.error('MFA challenge dispatch failed:', err);
-      setErrorMessage(
-        err.message ||
-          'Email OTP delivery is currently unavailable. Second factor authentication cannot be bypassed.'
-      );
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Handle per-digit OTP entry and backspace
-   */
-  const handleOtpDigitChange = (value: string, index: number) => {
-    // Handle paste of full 6-digit code
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').slice(0, 6).split('');
-      if (digits.length > 0) {
-        const nextDigits = [...otpDigits];
-        digits.forEach((d, i) => {
-          if (index + i < 6) {
-            nextDigits[index + i] = d;
-          }
-        });
-        setOtpDigits(nextDigits);
-        const focusIdx = Math.min(index + digits.length, 5);
-        otpInputRefs.current[focusIdx]?.focus();
-        return;
-      }
-    }
-
-    const digit = value.replace(/\D/g, '').slice(-1);
-    const nextDigits = [...otpDigits];
-    nextDigits[index] = digit;
-    setOtpDigits(nextDigits);
-
-    if (digit && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleOtpKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  /**
-   * STEP B: Verify OTP Code
-   * Enforces server-side validation, attempt decrement, and session grant.
-   */
-  const handleVerifyOtp = async () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    const fullCode = otpDigits.join('').trim();
-    if (fullCode.length !== 6) {
-      setErrorMessage('Please enter complete 6-digit OTP (Poora 6-ankon ka OTP enter karein).');
-      return;
-    }
-
-    if (attemptsRemaining <= 0) {
-      setErrorMessage(
-        'Maximum attempts exceeded (5/5). This OTP has expired. Please request a new code.'
-      );
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const result = await supabaseService.verifyMfaChallenge({
-        challengeId,
-        otpCode: fullCode,
-      });
-
-      if (result.success) {
-        setSuccessMessage('MFA Verified Successfully! Opening store...');
-
-        // Fetch user data from session
-        const { data: authData } = await supabase.auth.getUser();
-        if (authData?.user) {
-          await completeMfaLogin(authData.user.id, authData.user.user_metadata);
-        }
-
-        // Navigate to main application dashboard
-        router.replace('/(tabs)');
-      }
-    } catch (err: any) {
-      const remaining = Math.max(0, attemptsRemaining - 1);
-      setAttemptsRemaining(remaining);
-
-      if (remaining === 0) {
-        setErrorMessage(
-          'Incorrect OTP code. Maximum attempts reached (5/5). OTP challenge is locked. Click "Resend OTP" to request a new code.'
-        );
-      } else {
-        setErrorMessage(
-          `${err.message || 'Incorrect OTP code.'} Remaining attempts: ${remaining}/5.`
-        );
-      }
-
-      // Clear input and refocus first box
-      setOtpDigits(['', '', '', '', '', '']);
-      otpInputRefs.current[0]?.focus();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Resend OTP with strict 60s cooldown enforcement
-   */
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0 || isLoading) return;
-
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsLoading(true);
-
-    try {
-      const challenge = await supabaseService.requestMfaChallenge();
-      setChallengeId(challenge.challengeId);
-      setResendCooldown(60);
-      setAttemptsRemaining(5);
-      setOtpDigits(['', '', '', '', '', '']);
-      setSuccessMessage('New OTP sent to your email (Naya OTP email par bhej diya gaya hai).');
-      otpInputRefs.current[0]?.focus();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to resend OTP. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Switch Account / Reset to Step A
-   */
-  const handleSwitchAccount = async () => {
-    try {
-      await signOut();
-    } catch {
-      // ignore
-    }
-    setStep('CREDENTIALS');
-    setOtpDigits(['', '', '', '', '', '']);
-    setErrorMessage(null);
-    setSuccessMessage(null);
   };
 
   /**
@@ -357,53 +159,35 @@ export default function AuthScreen() {
           {/* Header Close / Back */}
           <View style={styles.topBar}>
             <Pressable
-              onPress={() => {
-                if (step === 'OTP_VERIFICATION') {
-                  handleSwitchAccount();
-                } else {
-                  router.back();
-                }
-              }}
+              onPress={() => router.back()}
               style={styles.backButton}
               hitSlop={12}
             >
-              <Ionicons
-                name={step === 'OTP_VERIFICATION' ? 'arrow-back' : 'close'}
-                size={24}
-                color={Palette.darkNavy}
-              />
+              <Ionicons name="close" size={24} color={Palette.darkNavy} />
             </Pressable>
 
             <View style={styles.brandBadge}>
               <Ionicons name="shield-checkmark" size={16} color={Palette.primaryBlueDark} />
-              <Text style={styles.brandBadgeText}>Paytm MFA Secured</Text>
+              <Text style={styles.brandBadgeText}>Supabase Cloud Secured</Text>
             </View>
           </View>
 
           {/* Logo & Heading */}
           <View style={styles.heroSection}>
             <View style={styles.iconCircle}>
-              <Ionicons
-                name={step === 'CREDENTIALS' ? 'storefront' : 'mail-unread'}
-                size={34}
-                color={Palette.primaryBlueDark}
-              />
+              <Ionicons name="storefront" size={34} color={Palette.primaryBlueDark} />
             </View>
 
             <Text style={styles.heroTitle}>
-              {step === 'CREDENTIALS'
-                ? mode === 'SIGN_IN'
-                  ? 'DukaanSaathi Partner Login'
-                  : 'Register New Dukaan'
-                : '2-Step Security Verification'}
+              {mode === 'SIGN_IN'
+                ? 'DukaanSaathi Partner Login'
+                : 'Register New Dukaan'}
             </Text>
 
             <Text style={styles.heroSubtitle}>
-              {step === 'CREDENTIALS'
-                ? mode === 'SIGN_IN'
-                  ? 'Apni dukan ke accounts aur ledger access karne ke liye login karein.'
-                  : 'Apni kirana dukan ke liye surakshit khata banayein.'
-                : `Suraksha code enter karein jo ${maskedEmail || 'aapke email'} par bheja gaya hai.`}
+              {mode === 'SIGN_IN'
+                ? 'Apni dukan ke accounts aur ledger access karne ke liye login karein.'
+                : 'Apni kirana dukan ke liye surakshit khata banayein.'}
             </Text>
           </View>
 
@@ -422,256 +206,157 @@ export default function AuthScreen() {
             </View>
           ) : null}
 
-          {/* ---------------- STEP A: CREDENTIALS ---------------- */}
-          {step === 'CREDENTIALS' && (
-            <View style={styles.card}>
-              {/* Mode Toggle */}
-              <View style={styles.toggleRow}>
-                <Pressable
-                  style={[styles.toggleBtn, mode === 'SIGN_IN' && styles.toggleBtnActive]}
-                  onPress={() => {
-                    setMode('SIGN_IN');
-                    setErrorMessage(null);
-                  }}
+          {/* Credentials Form */}
+          <View style={styles.card}>
+            {/* Mode Toggle */}
+            <View style={styles.toggleRow}>
+              <Pressable
+                style={[styles.toggleBtn, mode === 'SIGN_IN' && styles.toggleBtnActive]}
+                onPress={() => {
+                  setMode('SIGN_IN');
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                }}
+              >
+                <Text
+                  style={[styles.toggleBtnText, mode === 'SIGN_IN' && styles.toggleBtnTextActive]}
                 >
-                  <Text
-                    style={[styles.toggleBtnText, mode === 'SIGN_IN' && styles.toggleBtnTextActive]}
-                  >
-                    Sign In (लॉगिन)
-                  </Text>
-                </Pressable>
+                  Sign In (लॉगिन)
+                </Text>
+              </Pressable>
 
-                <Pressable
-                  style={[styles.toggleBtn, mode === 'SIGN_UP' && styles.toggleBtnActive]}
-                  onPress={() => {
-                    setMode('SIGN_UP');
-                    setErrorMessage(null);
-                  }}
+              <Pressable
+                style={[styles.toggleBtn, mode === 'SIGN_UP' && styles.toggleBtnActive]}
+                onPress={() => {
+                  setMode('SIGN_UP');
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                }}
+              >
+                <Text
+                  style={[styles.toggleBtnText, mode === 'SIGN_UP' && styles.toggleBtnTextActive]}
                 >
-                  <Text
-                    style={[styles.toggleBtnText, mode === 'SIGN_UP' && styles.toggleBtnTextActive]}
-                  >
-                    Register (नया खाता)
-                  </Text>
+                  Register (नया खाता)
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Sign Up Fields */}
+            {mode === 'SIGN_UP' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Store Name (दुकान का नाम) *</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="business" size={18} color={Palette.textSecondary} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. Sharma Kirana Store"
+                      placeholderTextColor={Palette.textMuted}
+                      value={storeName}
+                      onChangeText={setStoreName}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Proprietor Name (मालिक का नाम) *</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="person" size={18} color={Palette.textSecondary} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. Rajesh Sharma"
+                      placeholderTextColor={Palette.textMuted}
+                      value={ownerName}
+                      onChangeText={setOwnerName}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Phone Number (मोबाइल नंबर)</Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="call" size={18} color={Palette.textSecondary} />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="+91 98260 12345"
+                      placeholderTextColor={Palette.textMuted}
+                      keyboardType="phone-pad"
+                      value={phone}
+                      onChangeText={setPhone}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email Address (ईमेल) *</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="mail" size={18} color={Palette.textSecondary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="merchant@dukaan.com"
+                  placeholderTextColor={Palette.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password (पासवर्ड) *</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="lock-closed" size={18} color={Palette.textSecondary} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter min. 6 characters"
+                  placeholderTextColor={Palette.textMuted}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <Pressable
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeIconBtn}
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={Palette.textSecondary}
+                  />
                 </Pressable>
               </View>
+            </View>
 
-              {/* Sign Up Fields */}
-              {mode === 'SIGN_UP' && (
+            {/* Submit Button */}
+            <Pressable
+              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+              onPress={handleCredentialsSubmit}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color={Palette.white} size="small" />
+              ) : (
                 <>
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Store Name (दुकान का नाम) *</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="business" size={18} color={Palette.textSecondary} />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. Sharma Kirana Store"
-                        placeholderTextColor={Palette.textMuted}
-                        value={storeName}
-                        onChangeText={setStoreName}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Proprietor Name (मालिक का नाम) *</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="person" size={18} color={Palette.textSecondary} />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="e.g. Rajesh Sharma"
-                        placeholderTextColor={Palette.textMuted}
-                        value={ownerName}
-                        onChangeText={setOwnerName}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Phone Number (मोबाइल नंबर)</Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="call" size={18} color={Palette.textSecondary} />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="+91 98260 12345"
-                        placeholderTextColor={Palette.textMuted}
-                        keyboardType="phone-pad"
-                        value={phone}
-                        onChangeText={setPhone}
-                      />
-                    </View>
-                  </View>
+                  <Text style={styles.primaryButtonText}>
+                    {mode === 'SIGN_IN'
+                      ? 'Sign In to Store (लॉगिन करें)'
+                      : 'Create Account & Continue'}
+                  </Text>
+                  <Ionicons name="arrow-forward" size={18} color={Palette.white} />
                 </>
               )}
+            </Pressable>
 
-              {/* Email Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address (ईमेल) *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail" size={18} color={Palette.textSecondary} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="merchant@dukaan.com"
-                    placeholderTextColor={Palette.textMuted}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    value={email}
-                    onChangeText={setEmail}
-                  />
-                </View>
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Password (पासवर्ड) *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed" size={18} color={Palette.textSecondary} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter min. 6 characters"
-                    placeholderTextColor={Palette.textMuted}
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                  />
-                  <Pressable
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIconBtn}
-                    hitSlop={8}
-                  >
-                    <Ionicons
-                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color={Palette.textSecondary}
-                    />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Submit Button */}
-              <Pressable
-                style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-                onPress={handleCredentialsSubmit}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={Palette.white} size="small" />
-                ) : (
-                  <>
-                    <Text style={styles.primaryButtonText}>
-                      {mode === 'SIGN_IN'
-                        ? 'Verify Password & Request OTP'
-                        : 'Create Account & Continue'}
-                    </Text>
-                    <Ionicons name="arrow-forward" size={18} color={Palette.white} />
-                  </>
-                )}
-              </Pressable>
-
-              <Text style={styles.securityNote}>
-                🔒 2-Factor Authentication: Step 1 verifies credentials, Step 2 dispatches a 6-digit
-                code to your email.
-              </Text>
-            </View>
-          )}
-
-          {/* ---------------- STEP B: OTP VERIFICATION ---------------- */}
-          {step === 'OTP_VERIFICATION' && (
-            <View style={styles.card}>
-              <View style={styles.otpHeader}>
-                <Text style={styles.otpInstruction}>
-                  Enter the 6-digit code sent to your verified email:
-                </Text>
-                <Text style={styles.maskedEmailText}>{maskedEmail}</Text>
-              </View>
-
-              {/* 6-Digit OTP Box Grid */}
-              <View style={styles.otpBoxesRow}>
-                {otpDigits.map((digit, index) => (
-                  <TextInput
-                    key={`otp-box-${index}`}
-                    ref={(el) => {
-                      otpInputRefs.current[index] = el;
-                    }}
-                    style={[
-                      styles.otpBox,
-                      digit ? styles.otpBoxFilled : null,
-                      index === 0 && !digit ? styles.otpBoxActive : null,
-                    ]}
-                    value={digit}
-                    onChangeText={(val) => handleOtpDigitChange(val, index)}
-                    onKeyPress={(e) => handleOtpKeyPress(e, index)}
-                    keyboardType="number-pad"
-                    maxLength={index === 0 ? 6 : 1}
-                    selectTextOnFocus
-                    textAlign="center"
-                  />
-                ))}
-              </View>
-
-              <View style={styles.attemptsRow}>
-                <Ionicons
-                  name="shield-outline"
-                  size={14}
-                  color={attemptsRemaining <= 2 ? Palette.dangerRed : Palette.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.attemptsText,
-                    attemptsRemaining <= 2 ? { color: Palette.dangerRed } : null,
-                  ]}
-                >
-                  Attempts remaining: {attemptsRemaining}/5 • Valid for 60 mins
-                </Text>
-              </View>
-
-              {/* Verify OTP Button */}
-              <Pressable
-                style={[
-                  styles.primaryButton,
-                  (isLoading || attemptsRemaining <= 0) && styles.buttonDisabled,
-                ]}
-                onPress={handleVerifyOtp}
-                disabled={isLoading || attemptsRemaining <= 0}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color={Palette.white} size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="lock-open" size={18} color={Palette.white} />
-                    <Text style={styles.primaryButtonText}>
-                      Verify & Open Store (सत्यापित करें)
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-
-              {/* Resend OTP Button */}
-              <View style={styles.resendContainer}>
-                {resendCooldown > 0 ? (
-                  <Text style={styles.resendCooldownText}>
-                    Resend OTP in {resendCooldown}s (पुनः भेजें)
-                  </Text>
-                ) : (
-                  <Pressable
-                    onPress={handleResendOtp}
-                    disabled={isLoading}
-                    style={styles.resendButton}
-                  >
-                    <Ionicons name="refresh" size={16} color={Palette.primaryBlueDark} />
-                    <Text style={styles.resendButtonText}>Resend OTP (ओटीपी दोबारा भेजें)</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {/* Switch Account */}
-              <Pressable onPress={handleSwitchAccount} style={styles.switchAccountBtn}>
-                <Text style={styles.switchAccountText}>
-                  Wrong email? Log in with a different account
-                </Text>
-              </Pressable>
-            </View>
-          )}
+            <Text style={styles.securityNote}>
+              🔒 Secure Cloud Authentication: Direct encrypted session with Supabase Row-Level Security.
+            </Text>
+          </View>
 
           {/* Demo Mode Fallback Option */}
           <View style={styles.demoModeSection}>
@@ -904,87 +589,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 16,
-  },
-  otpHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  otpInstruction: {
-    fontSize: 14,
-    color: Palette.textSecondary,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  maskedEmailText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: Palette.darkNavy,
-  },
-  otpBoxesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  otpBox: {
-    width: 44,
-    height: 52,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Palette.border,
-    backgroundColor: Palette.background,
-    fontSize: 22,
-    fontWeight: '800',
-    color: Palette.darkNavy,
-  },
-  otpBoxFilled: {
-    borderColor: Palette.primaryBlue,
-    backgroundColor: Palette.white,
-  },
-  otpBoxActive: {
-    borderColor: Palette.primaryBlueDark,
-  },
-  attemptsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginBottom: 16,
-  },
-  attemptsText: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-    fontWeight: '600',
-  },
-  resendContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  resendCooldownText: {
-    fontSize: 13,
-    color: Palette.textMuted,
-    fontWeight: '600',
-  },
-  resendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  resendButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Palette.primaryBlueDark,
-  },
-  switchAccountBtn: {
-    alignItems: 'center',
-    marginTop: 14,
-    paddingVertical: 4,
-  },
-  switchAccountText: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-    textDecorationLine: 'underline',
   },
   demoModeSection: {
     marginTop: 24,
