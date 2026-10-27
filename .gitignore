@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+temp-app/node_modules/
+
+# Expo and builds
+.expo/
+temp-app/.expo/
+dist/
+temp-app/dist/
+web-build/
+temp-app/web-build/
+
+# Environment files and credentials
+.env
+.env.*
+.env*.local
+*.pem
+*.key
+
+# Editor and OS
+.DS_Store
+Thumbs.db
