@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
 import { rupeesToPaise } from '@/utils/format';
+import { generateUUID } from '@/utils/uuid';
 
 export default function NewCustomerScreen() {
   const router = useRouter();
@@ -22,28 +24,48 @@ export default function NewCustomerScreen() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const handleSave = async () => {
+    // Synchronous guard checked BEFORE the first await
+    if (isSubmittingRef.current) {
+      return;
+    }
+
     if (!name.trim()) {
       Alert.alert('Name Required', 'Kripya grahak ka naam enter karein.');
       return;
     }
 
-    const openingPaise = openingBalance ? rupeesToPaise(openingBalance) : 0;
-    const cleanPhone = phone.trim() ? (phone.startsWith('+91') ? phone : `+91 ${phone.trim()}`) : undefined;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-    const newCust = await addCustomer(name, cleanPhone, openingPaise);
+    // Generate ONE operation / customer ID (random UUID) per intentional submit attempt
+    const operationCustomerId = generateUUID();
 
-    Alert.alert(
-      'Grahak Joda Gaya 🎉',
-      `${newCust.name} ka khata safalta-purvak ban gaya hai.`,
-      [
-        {
-          text: 'Khata Kholein',
-          onPress: () => router.replace(`/customer/${newCust.id}`),
-        },
-      ]
-    );
+    try {
+      const openingPaise = openingBalance ? rupeesToPaise(openingBalance) : 0;
+      const cleanPhone = phone.trim() ? (phone.startsWith('+91') ? phone : `+91 ${phone.trim()}`) : undefined;
+
+      const newCust = await addCustomer(name, cleanPhone, openingPaise, operationCustomerId);
+
+      Alert.alert(
+        'Grahak Joda Gaya 🎉',
+        `${newCust.name} ka khata safalta-purvak ban gaya hai.`,
+        [
+          {
+            text: 'Khata Kholein',
+            onPress: () => router.replace(`/customer/${newCust.id}`),
+          },
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Grahak jodne mein samasya aayi. Kripya punah prayas karein.');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -111,9 +133,22 @@ export default function NewCustomerScreen() {
         </View>
 
         {/* Save Button */}
-        <Pressable style={styles.saveButton} onPress={handleSave}>
-          <Ionicons name="checkmark-circle" size={20} color={Palette.white} />
-          <Text style={styles.saveButtonText}>Grahak Khata Banayein</Text>
+        <Pressable
+          style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <ActivityIndicator size="small" color={Palette.white} />
+              <Text style={styles.saveButtonText}>Creating...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={20} color={Palette.white} />
+              <Text style={styles.saveButtonText}>Grahak Khata Banayein</Text>
+            </>
+          )}
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -203,6 +238,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: Palette.white,

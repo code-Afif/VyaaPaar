@@ -20,10 +20,20 @@ type FilterTab = 'ALL' | 'DUE' | 'SETTLED';
 
 export default function KhataScreen() {
   const router = useRouter();
-  const { customers, briefing } = useApp();
+  const { customers, briefing, refreshFromSupabase } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<FilterTab>('ALL');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshFromSupabase();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {
@@ -150,6 +160,8 @@ export default function KhataScreen() {
         <FlatList
           data={filteredCustomers}
           keyExtractor={(item) => item.id}
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
           renderItem={({ item }) => (
             <CustomerCard
               customer={item}

@@ -270,23 +270,35 @@ export const supabaseService = {
   },
 
   /**
-   * Insert new customer into Supabase
+   * Insert new customer into Supabase with optional client-generated idempotent ID
    */
   async createCustomer(
     merchantId: string,
     name: string,
     phone?: string,
-    openingBalancePaise: number = 0
+    openingBalancePaise: number = 0,
+    customerId?: string
   ): Promise<Customer | null> {
     if (!isSupabaseConfigured()) return null;
 
+    const insertPayload: {
+      merchant_id: string;
+      name: string;
+      phone?: string;
+      id?: string;
+    } = {
+      merchant_id: merchantId,
+      name: name.trim(),
+      phone: phone?.trim(),
+    };
+
+    if (customerId) {
+      insertPayload.id = customerId;
+    }
+
     const { data: newCust, error } = await supabase
       .from('customers')
-      .insert({
-        merchant_id: merchantId,
-        name: name.trim(),
-        phone: phone?.trim(),
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

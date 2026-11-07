@@ -51,7 +51,8 @@ interface AppContextType {
   addCustomer: (
     name: string,
     phone?: string,
-    openingBalancePaise?: number
+    openingBalancePaise?: number,
+    customId?: string
   ) => Promise<Customer>;
   recordCreditSale: (
     customerId: string,
@@ -166,7 +167,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         supabaseService.getProducts(userId),
       ]);
 
-      if (dbCusts.length > 0) setCustomers(dbCusts);
+      if (dbCusts.length > 0) {
+        // Deduplicate customers by ID
+        const seen = new Set<string>();
+        const uniqueCusts: Customer[] = [];
+        for (const c of dbCusts) {
+          if (!seen.has(c.id)) {
+            seen.add(c.id);
+            uniqueCusts.push(c);
+          }
+        }
+        setCustomers(uniqueCusts);
+      }
       if (dbLedger.length > 0) setLedgerEntries(dbLedger);
       if (dbPayments.length > 0) setPaymentEvents(dbPayments);
       if (dbProducts.length > 0) setInventory(dbProducts);
@@ -242,24 +254,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addCustomer = async (
     name: string,
     phone?: string,
-    openingBalancePaise: number = 0
+    openingBalancePaise: number = 0,
+    customId?: string
   ): Promise<Customer> => {
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
       const created = await supabaseService.createCustomer(
         merchant.id,
         name,
         phone,
-        openingBalancePaise
+        openingBalancePaise,
+        customId
       );
       if (created) {
-        setCustomers((prev) => [created, ...prev]);
+        setCustomers((prev) => {
+          if (prev.some((c) => c.id === created.id)) return prev;
+          return [created, ...prev];
+        });
         await refreshFromSupabase();
         return created;
       }
     }
 
     const newCust: Customer = {
-      id: `cust-${Date.now()}`,
+      id: customId || `cust-${Date.now()}`,
       name: name.trim(),
       phone: phone?.trim(),
       openingBalancePaise,
@@ -270,21 +287,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date().toISOString().split('T')[0],
     };
 
-    setCustomers((prev) => [newCust, ...prev]);
+    setCustomers((prev) => {
+      if (prev.some((c) => c.id === newCust.id)) return prev;
+      return [newCust, ...prev];
+    });
 
     if (openingBalancePaise > 0) {
-      const openingEntry: LedgerEntry = {
-        id: `led-${Date.now()}`,
-        customerId: newCust.id,
-        customerName: newCust.name,
-        type: 'CREDIT_SALE',
-        amountPaise: openingBalancePaise,
-        description: 'Opening Balance (Pichhla Purana Udhaar)',
-        createdAt: 'Just now',
-        source: 'MANUAL',
-        isSimulated: true,
-      };
-      setLedgerEntries((prev) => [openingEntry, ...prev]);
+      const openingEntryId = `led-${newCust.id}`;
+      setLedgerEntries((prev) => {
+        if (prev.some((l) => l.id === openingEntryId)) return prev;
+        const openingEntry: LedgerEntry = {
+          id: openingEntryId,
+          customerId: newCust.id,
+          customerName: newCust.name,
+          type: 'CREDIT_SALE',
+          amountPaise: openingBalancePaise,
+          description: 'Opening Balance (Pichhla Purana Udhaar)',
+          createdAt: 'Just now',
+          source: 'MANUAL',
+          isSimulated: true,
+        };
+        return [openingEntry, ...prev];
+      });
     }
 
     return newCust;
