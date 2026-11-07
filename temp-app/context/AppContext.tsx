@@ -54,6 +54,11 @@ interface AppContextType {
     openingBalancePaise?: number,
     customId?: string
   ) => Promise<Customer>;
+  updateCustomer: (
+    customerId: string,
+    name: string,
+    phone?: string
+  ) => Promise<Customer>;
   recordCreditSale: (
     customerId: string,
     amountPaise: number,
@@ -167,21 +172,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         supabaseService.getProducts(userId),
       ]);
 
-      if (dbCusts.length > 0) {
-        // Deduplicate customers by ID
-        const seen = new Set<string>();
-        const uniqueCusts: Customer[] = [];
-        for (const c of dbCusts) {
-          if (!seen.has(c.id)) {
-            seen.add(c.id);
-            uniqueCusts.push(c);
-          }
+      // Deduplicate customers by ID
+      const seen = new Set<string>();
+      const uniqueCusts: Customer[] = [];
+      for (const c of dbCusts) {
+        if (!seen.has(c.id)) {
+          seen.add(c.id);
+          uniqueCusts.push(c);
         }
-        setCustomers(uniqueCusts);
       }
-      if (dbLedger.length > 0) setLedgerEntries(dbLedger);
-      if (dbPayments.length > 0) setPaymentEvents(dbPayments);
-      if (dbProducts.length > 0) setInventory(dbProducts);
+      setCustomers(uniqueCusts);
+      setLedgerEntries(dbLedger);
+      setPaymentEvents(dbPayments);
+      setInventory(dbProducts);
+
+      if (__DEV__) {
+        console.log(`[AppContext] Loaded ${uniqueCusts.length} merchant customers (Unique IDs: ${uniqueCusts.length})`);
+      }
     } catch (err) {
       console.warn('Error loading Supabase merchant data:', err);
     }
@@ -312,6 +319,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     return newCust;
+  };
+
+  const updateCustomer = async (
+    customerId: string,
+    name: string,
+    phone?: string
+  ): Promise<Customer> => {
+    const trimmedName = name.trim();
+    const cleanPhone = phone ? phone.replace(/[^0-9+]/g, '').trim() : undefined;
+
+    if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
+      await supabaseService.updateCustomer({
+        merchantId: merchant.id,
+        customerId,
+        name: trimmedName,
+        phone: cleanPhone,
+      });
+    }
+
+    let updatedCust: Customer | undefined;
+
+    setCustomers((prev) =>
+      prev.map((c) => {
+        if (c.id === customerId) {
+          updatedCust = {
+            ...c,
+            name: trimmedName,
+            phone: cleanPhone || undefined,
+            lastActivityDate: 'Just now',
+          };
+          return updatedCust;
+        }
+        return c;
+      })
+    );
+
+    // Also update customer name on related ledger entries in memory
+    setLedgerEntries((prev) =>
+      prev.map((l) =>
+        l.customerId === customerId ? { ...l, customerName: trimmedName } : l
+      )
+    );
+
+    if (!updatedCust) {
+      const existing = customers.find((c) => c.id === customerId);
+      if (!existing) throw new Error('Customer not found');
+      updatedCust = {
+        ...existing,
+        name: trimmedName,
+        phone: cleanPhone || undefined,
+      };
+    }
+
+    return updatedCust;
   };
 
   const recordCreditSale = async (
@@ -531,6 +592,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         completeLogin,
         seedCurrentSupabaseAccount,
         addCustomer,
+        updateCustomer,
         recordCreditSale,
         recordRepayment,
         reconcilePayment,

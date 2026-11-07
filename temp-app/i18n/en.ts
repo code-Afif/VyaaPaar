@@ -102,6 +102,7 @@ export const en = {
     emptyTitle: 'No Customers Found',
     emptySub: "Tap '+ New' above to add your first customer.",
     emptyBtn: '+ Add New Customer',
+    loadingCustomers: 'Loading customer ledger...',
   },
 
   customerNew: {
@@ -161,6 +162,17 @@ export const en = {
     shareFallbackBtn: 'Share Sheet',
     whatsappSendBtn: 'Send on WhatsApp',
     editableMsgLabel: 'Editable Reminder Message:',
+    editCustomerBtn: 'Edit Customer',
+    editModalTitle: 'Edit Customer Profile',
+    nameLabel: 'Customer Name *',
+    phoneLabel: 'Mobile Number',
+    saveChangesBtn: 'Save Changes',
+    savingBtn: 'Saving...',
+    editSuccessTitle: 'Customer Updated 🎉',
+    editSuccessMsg: 'Customer profile details updated successfully.',
+    phoneDisplay: 'Phone: {phone}',
+    noPhone: 'No mobile number',
+    memberSince: 'Customer since {date}',
   },
 
   payments: {

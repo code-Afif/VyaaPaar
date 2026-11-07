@@ -6,6 +6,7 @@ import {
   FlatList,
   TextInput,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,7 @@ type FilterTab = 'ALL' | 'DUE' | 'SETTLED';
 
 export default function KhataScreen() {
   const router = useRouter();
-  const { customers, briefing, refreshFromSupabase } = useApp();
+  const { customers, briefing, refreshFromSupabase, isLoading } = useApp();
   const { t } = useLanguage();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,24 +39,33 @@ export default function KhataScreen() {
   };
 
   const filteredCustomers = useMemo(() => {
+    const safeQuery = searchQuery.trim().toLowerCase();
+
     return customers.filter((c) => {
-      // Search filter
+      // Safe Search filter
+      const safeName = (c.name || '').toLowerCase();
       const matchesSearch =
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.phone && c.phone.includes(searchQuery));
+        safeName.includes(safeQuery) ||
+        (c.phone ? c.phone.includes(safeQuery) : false);
 
       if (!matchesSearch) return false;
 
       // Status filter
       if (filterTab === 'DUE') {
-        return c.currentBalancePaise > 0;
+        return (c.currentBalancePaise || 0) > 0;
       }
       if (filterTab === 'SETTLED') {
-        return c.currentBalancePaise === 0;
+        return (c.currentBalancePaise || 0) === 0;
       }
       return true;
     });
   }, [customers, searchQuery, filterTab]);
+
+  if (__DEV__) {
+    console.log(
+      `[KhataScreen] Total in context: ${customers.length}, Filtered count: ${filteredCustomers.length}, Unique IDs: ${new Set(customers.map((c) => c.id)).size}`
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -161,6 +171,7 @@ export default function KhataScreen() {
 
         {/* Customers List */}
         <FlatList
+          style={styles.list}
           data={filteredCustomers}
           keyExtractor={(item) => item.id}
           refreshing={isRefreshing}
@@ -174,23 +185,32 @@ export default function KhataScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons
-                name="people-outline"
-                size={48}
-                color={Palette.textMuted}
-              />
-              <Text style={styles.emptyTitle}>{t('khata.emptyTitle')}</Text>
-              <Text style={styles.emptySub}>
-                {t('khata.emptySub')}
-              </Text>
-              <Pressable
-                style={styles.emptyButton}
-                onPress={() => router.push('/customer/new')}
-              >
-                <Text style={styles.emptyButtonText}>{t('khata.emptyBtn')}</Text>
-              </Pressable>
-            </View>
+            isLoading ? (
+              <View style={styles.emptyContainer}>
+                <ActivityIndicator size="large" color={Palette.primaryBlue} />
+                <Text style={[styles.emptySub, { marginTop: 12 }]}>
+                  {t('khata.loadingCustomers')}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="people-outline"
+                  size={48}
+                  color={Palette.textMuted}
+                />
+                <Text style={styles.emptyTitle}>{t('khata.emptyTitle')}</Text>
+                <Text style={styles.emptySub}>
+                  {t('khata.emptySub')}
+                </Text>
+                <Pressable
+                  style={styles.emptyButton}
+                  onPress={() => router.push('/customer/new')}
+                >
+                  <Text style={styles.emptyButtonText}>{t('khata.emptyBtn')}</Text>
+                </Pressable>
+              </View>
+            )
           }
         />
       </View>
@@ -315,6 +335,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
+  },
+  list: {
+    flex: 1,
   },
   emptyContainer: {
     alignItems: 'center',

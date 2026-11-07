@@ -333,6 +333,47 @@ export const supabaseService = {
   },
 
   /**
+   * Update customer profile fields (strictly name and phone only)
+   * Scoped by customerId AND merchantId (enforced by RLS policy customers_update_own)
+   */
+  async updateCustomer(params: {
+    merchantId: string;
+    customerId: string;
+    name: string;
+    phone?: string;
+  }): Promise<{ name: string; phone?: string }> {
+    if (!isSupabaseConfigured()) {
+      return {
+        name: params.name.trim(),
+        phone: params.phone?.trim() || undefined,
+      };
+    }
+
+    const cleanPhone = params.phone ? params.phone.replace(/[^0-9+]/g, '').trim() : null;
+
+    const { data: updatedCust, error } = await supabase
+      .from('customers')
+      .update({
+        name: params.name.trim(),
+        phone: cleanPhone || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.customerId)
+      .eq('merchant_id', params.merchantId)
+      .select('name, phone')
+      .single();
+
+    if (error || !updatedCust) {
+      throw new Error(`Failed to update customer: ${error?.message}`);
+    }
+
+    return {
+      name: updatedCust.name,
+      phone: updatedCust.phone || undefined,
+    };
+  },
+
+  /**
    * Insert append-only ledger entry with idempotency key
    */
   async recordLedgerEntry(params: {

@@ -104,6 +104,7 @@ export const hinglish: typeof en = {
     emptyTitle: 'Koi Grahak Nahi Mila',
     emptySub: "Naya grahak jodne ke liye upar '+ Naya' button dabayein.",
     emptyBtn: '+ Add New Customer',
+    loadingCustomers: 'Customer ledger load ho raha hai...',
   },
 
   customerNew: {
@@ -163,6 +164,17 @@ export const hinglish: typeof en = {
     shareFallbackBtn: 'Share Sheet',
     whatsappSendBtn: 'Send on WhatsApp',
     editableMsgLabel: 'Editable Reminder Message (Hindi/Hinglish):',
+    editCustomerBtn: 'Customer Edit Karein',
+    editModalTitle: 'Customer Details Edit Karein',
+    nameLabel: 'Customer Ka Naam *',
+    phoneLabel: 'Mobile Number',
+    saveChangesBtn: 'Changes Save Karein',
+    savingBtn: 'Save Ho Raha Hai...',
+    editSuccessTitle: 'Customer Update Ho Gaya 🎉',
+    editSuccessMsg: 'Customer details safalta-purvak update ho gaye.',
+    phoneDisplay: 'Phone: {phone}',
+    noPhone: 'Phone number nahi hai',
+    memberSince: 'Customer since: {date}',
   },
 
   payments: {

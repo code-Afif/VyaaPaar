@@ -15,9 +15,11 @@ export const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onPress })
   const { t } = useLanguage();
   const hasDue = customer.currentBalancePaise > 0;
 
-  // Extract initials
-  const initials = customer.name
-    .split(' ')
+  // Extract initials safely
+  const initials = (customer.name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
     .map((n) => n[0])
     .slice(0, 2)
     .join('')

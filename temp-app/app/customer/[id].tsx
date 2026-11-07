@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,7 @@ export default function CustomerDetailScreen() {
     getCustomerLedger,
     recordCreditSale,
     recordRepayment,
+    updateCustomer,
     merchant,
   } = useApp();
 
@@ -43,6 +45,13 @@ export default function CustomerDetailScreen() {
   // Reminder Modal state
   const [reminderModalVisible, setReminderModalVisible] = useState(false);
   const [reminderText, setReminderText] = useState('');
+
+  // Edit Customer Modal state with synchronous rapid-tap guard
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
+  const isUpdatingRef = useRef(false);
 
   if (!customer) {
     return (
@@ -131,6 +140,37 @@ export default function CustomerDetailScreen() {
       .catch(() => handleSendViaShare());
   };
 
+  const handleOpenEditModal = () => {
+    setEditName(customer.name);
+    setEditPhone(customer.phone || '');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (isUpdatingRef.current) return;
+
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      Alert.alert(t('customerNew.nameValidationTitle'), t('customerNew.nameValidationMsg'));
+      return;
+    }
+
+    const cleanPhone = editPhone.replace(/[^0-9+]/g, '').trim();
+
+    try {
+      isUpdatingRef.current = true;
+      setIsUpdating(true);
+      await updateCustomer(customer.id, trimmedName, cleanPhone || undefined);
+      setEditModalVisible(false);
+      Alert.alert(t('customerDetail.editSuccessTitle'), t('customerDetail.editSuccessMsg'));
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Failed to update customer profile');
+    } finally {
+      setIsUpdating(false);
+      isUpdatingRef.current = false;
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Top Header */}
@@ -138,17 +178,27 @@ export default function CustomerDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <Ionicons name="arrow-back" size={24} color={Palette.darkNavy} />
         </Pressable>
-        <Text style={styles.headerTitle}>{customer.name}</Text>
-        {customer.phone ? (
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {customer.name}
+        </Text>
+        <View style={styles.headerRightActions}>
           <Pressable
-            style={styles.callButton}
-            onPress={() => Linking.openURL(`tel:${customer.phone}`)}
+            style={styles.editHeaderBtn}
+            onPress={handleOpenEditModal}
+            accessibilityLabel={t('customerDetail.editCustomerBtn')}
           >
-            <Ionicons name="call" size={18} color={Palette.primaryBlue} />
+            <Ionicons name="pencil" size={17} color={Palette.darkNavy} />
           </Pressable>
-        ) : (
-          <View style={{ width: 36 }} />
-        )}
+          {customer.phone && (
+            <Pressable
+              style={styles.callButton}
+              onPress={() => Linking.openURL(`tel:${customer.phone}`)}
+              accessibilityLabel={t('customerDetail.actionCall')}
+            >
+              <Ionicons name="call" size={17} color={Palette.primaryBlue} />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -156,6 +206,60 @@ export default function CustomerDetailScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
+        {/* Customer Profile & Info Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileTopRow}>
+            <View style={styles.profileAvatar}>
+              <Text style={styles.profileAvatarText}>
+                {(customer.name || '')
+                  .trim()
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'C'}
+              </Text>
+            </View>
+            <View style={styles.profileInfoCol}>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {customer.name}
+              </Text>
+              <View style={styles.profilePhoneRow}>
+                <Ionicons
+                  name="call-outline"
+                  size={13}
+                  color={Palette.textSecondary}
+                />
+                <Text style={styles.profilePhone}>
+                  {customer.phone || t('customerDetail.noPhone')}
+                </Text>
+              </View>
+              {customer.createdAt && (
+                <Text style={styles.profileCreated}>
+                  {t('customerDetail.memberSince', {
+                    date: new Date(customer.createdAt).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    }),
+                  })}
+                </Text>
+              )}
+            </View>
+            <Pressable
+              style={styles.editProfileBtn}
+              onPress={handleOpenEditModal}
+              accessibilityLabel={t('customerDetail.editCustomerBtn')}
+            >
+              <Ionicons name="pencil" size={13} color={Palette.primaryBlue} />
+              <Text style={styles.editProfileBtnText}>
+                {t('customerDetail.editCustomerBtn')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* Customer Balance Card */}
         <View style={styles.balanceCard}>
           <View style={styles.balanceTopRow}>
@@ -359,6 +463,90 @@ export default function CustomerDetailScreen() {
               >
                 <Ionicons name="logo-whatsapp" size={18} color={Palette.white} />
                 <Text style={styles.whatsappSendText}>{t('customerDetail.whatsappSendBtn')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Customer Profile Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!isUpdating) setEditModalVisible(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {t('customerDetail.editModalTitle')}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  if (!isUpdating) setEditModalVisible(false);
+                }}
+                hitSlop={10}
+                disabled={isUpdating}
+              >
+                <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.inputLabel}>{t('customerDetail.nameLabel')}</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder={t('customerNew.namePlaceholder')}
+              placeholderTextColor={Palette.textMuted}
+              value={editName}
+              onChangeText={setEditName}
+              editable={!isUpdating}
+              autoFocus
+            />
+
+            <Text style={styles.inputLabel}>{t('customerDetail.phoneLabel')}</Text>
+            <TextInput
+              style={styles.textInput}
+              keyboardType="phone-pad"
+              placeholder={t('customerNew.phonePlaceholder')}
+              placeholderTextColor={Palette.textMuted}
+              value={editPhone}
+              onChangeText={setEditPhone}
+              editable={!isUpdating}
+              maxLength={15}
+            />
+
+            <View style={styles.editActionsRow}>
+              <Pressable
+                style={styles.cancelEditBtn}
+                onPress={() => setEditModalVisible(false)}
+                disabled={isUpdating}
+              >
+                <Text style={styles.cancelEditBtnText}>
+                  {t('common.cancel')}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.saveEditBtn,
+                  isUpdating && styles.saveEditBtnDisabled,
+                ]}
+                onPress={handleSaveEdit}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color={Palette.white} />
+                ) : (
+                  <Ionicons name="checkmark-circle" size={18} color={Palette.white} />
+                )}
+                <Text style={styles.saveEditBtnText}>
+                  {isUpdating
+                    ? t('customerDetail.savingBtn')
+                    : t('customerDetail.saveChangesBtn')}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -686,6 +874,121 @@ const styles = StyleSheet.create({
   },
   whatsappSendText: {
     fontSize: 13,
+    fontWeight: '700',
+    color: Palette.white,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileCard: {
+    backgroundColor: Palette.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    padding: 14,
+    marginBottom: 12,
+  },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Palette.primaryBlueLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  profileAvatarText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Palette.primaryBlueDark,
+  },
+  profileInfoCol: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Palette.darkNavy,
+  },
+  profilePhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  profilePhone: {
+    fontSize: 13,
+    color: Palette.textSecondary,
+    fontWeight: '500',
+  },
+  profileCreated: {
+    fontSize: 11,
+    color: Palette.textMuted,
+    marginTop: 2,
+  },
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Palette.primaryBlueLight,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  editProfileBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Palette.primaryBlueDark,
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  cancelEditBtn: {
+    flex: 1,
+    backgroundColor: Palette.white,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelEditBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Palette.textSecondary,
+  },
+  saveEditBtn: {
+    flex: 1.5,
+    backgroundColor: Palette.primaryBlue,
+    borderRadius: 8,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  saveEditBtnDisabled: {
+    opacity: 0.7,
+  },
+  saveEditBtnText: {
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.white,
   },

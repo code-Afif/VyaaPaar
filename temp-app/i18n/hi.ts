@@ -104,6 +104,7 @@ export const hi: typeof en = {
     emptyTitle: 'कोई ग्राहक नहीं मिला',
     emptySub: "नया ग्राहक जोड़ने के लिए ऊपर '+ नया' बटन दबाएं।",
     emptyBtn: '+ नया ग्राहक जोड़ें',
+    loadingCustomers: 'ग्राहक खाता लोड हो रहा है...',
   },
 
   customerNew: {
@@ -163,6 +164,17 @@ export const hi: typeof en = {
     shareFallbackBtn: 'शेयर करें',
     whatsappSendBtn: 'व्हाट्सएप पर भेजें',
     editableMsgLabel: 'संपादन योग्य रिमाइंडर संदेश:',
+    editCustomerBtn: 'ग्राहक विवरण बदलें',
+    editModalTitle: 'ग्राहक विवरण संपादित करें',
+    nameLabel: 'ग्राहक का नाम *',
+    phoneLabel: 'मोबाइल नंबर',
+    saveChangesBtn: 'बदलाव सुरक्षित करें',
+    savingBtn: 'सुरक्षित हो रहा है...',
+    editSuccessTitle: 'विवरण बदला गया 🎉',
+    editSuccessMsg: 'ग्राहक का विवरण सफलतापूर्वक सुरक्षित हो गया।',
+    phoneDisplay: 'फोन: {phone}',
+    noPhone: 'फोन नंबर उपलब्ध नहीं',
+    memberSince: 'ग्राहक पंजीकरण: {date}',
   },
 
   payments: {
