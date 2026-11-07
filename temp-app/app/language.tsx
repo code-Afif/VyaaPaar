@@ -83,6 +83,7 @@ export default function LanguageScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       >
         {/* Multilingual Heading */}
         <View style={styles.headerSection}>
@@ -144,8 +145,10 @@ export default function LanguageScreen() {
             );
           })}
         </View>
+      </ScrollView>
 
-        {/* Continue Button */}
+      {/* Bottom Action Bar */}
+      <View style={styles.bottomBar}>
         <Pressable
           style={styles.continueButton}
           onPress={handleContinue}
@@ -156,7 +159,7 @@ export default function LanguageScreen() {
           </Text>
           <Ionicons name="arrow-forward" size={18} color={Palette.white} />
         </Pressable>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -171,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Palette.border,
   },
@@ -192,42 +195,42 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.background,
   },
   contentContainer: {
-    padding: 20,
-    justifyContent: 'space-between',
-    minHeight: '100%',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   headerSection: {
-    marginTop: 16,
-    marginBottom: 24,
+    marginTop: 8,
+    marginBottom: 16,
   },
   mainHeading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: Palette.darkNavy,
-    lineHeight: 28,
-    letterSpacing: 0.2,
+    lineHeight: 25,
+    letterSpacing: 0.1,
   },
   subHeading: {
-    fontSize: 14,
+    fontSize: 13,
     color: Palette.textSecondary,
-    marginTop: 12,
-    lineHeight: 20,
+    marginTop: 6,
+    lineHeight: 18,
   },
   optionsList: {
-    gap: 14,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 12,
   },
   optionCard: {
     backgroundColor: Palette.white,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: Palette.border,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 80,
+    minHeight: 64,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   },
   optionContent: {
     flex: 1,
-    marginRight: 14,
+    marginRight: 12,
   },
   optionNameRow: {
     flexDirection: 'row',
@@ -248,7 +251,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nativeName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: Palette.darkNavy,
   },
@@ -267,15 +270,15 @@ const styles = StyleSheet.create({
     color: Palette.primaryBlueDark,
   },
   exampleText: {
-    fontSize: 13,
+    fontSize: 12,
     color: Palette.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
+    marginTop: 3,
+    lineHeight: 16,
   },
   radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
     borderColor: Palette.border,
     alignItems: 'center',
@@ -285,21 +288,26 @@ const styles = StyleSheet.create({
     borderColor: Palette.primaryBlue,
   },
   radioInnerCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: Palette.primaryBlue,
+  },
+  bottomBar: {
+    backgroundColor: Palette.white,
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   continueButton: {
     backgroundColor: Palette.primaryBlue,
-    borderRadius: 12,
-    minHeight: 52,
+    borderRadius: 10,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 'auto',
-    marginBottom: 16,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -308,7 +316,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: Palette.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
 });
