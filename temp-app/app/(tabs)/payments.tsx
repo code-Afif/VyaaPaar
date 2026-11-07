@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Header } from '@/components/Header';
 import { PaymentEventCard } from '@/components/PaymentEventCard';
 import { formatPaise } from '@/utils/format';
@@ -20,6 +21,7 @@ type PaymentFilter = 'ALL' | 'UNMATCHED' | 'RECONCILED';
 
 export default function PaymentsScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { paymentEvents, reconcilePayment, simulateIncomingPayment, customers } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<PaymentFilter>('ALL');
@@ -47,18 +49,24 @@ export default function PaymentsScreen() {
     if (!payment || !customer) return;
 
     Alert.alert(
-      'Confirm Payment Reconciliation',
-      `Kya aap ${formatPaise(payment.amountPaise)} ka payment ${customer.name} ke Khata mein jama (reconcile) karna chahte hain?`,
+      t('payments.confirmMatchTitle'),
+      t('payments.confirmMatchMsg', {
+        amount: formatPaise(payment.amountPaise),
+        name: customer.name,
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Haan, Reconcile Karein',
+          text: t('payments.confirmMatchBtn'),
           style: 'default',
           onPress: () => {
             reconcilePayment(paymentId, customerId);
             Alert.alert(
-              'Reconciled Successfully! 🎉',
-              `${customer.name} ke khate mein ${formatPaise(payment.amountPaise)} jama ho gaya hai.`
+              t('payments.reconciledSuccessTitle'),
+              t('payments.reconciledSuccessMsg', {
+                amount: formatPaise(payment.amountPaise),
+                name: customer.name,
+              })
             );
           },
         },
@@ -70,16 +78,19 @@ export default function PaymentsScreen() {
     // Generate a simulated payment from Ramesh Kumar (₹500) or Anita Devi (₹320)
     const newPay = simulateIncomingPayment(50000, 'Ramesh Kumar');
     Alert.alert(
-      'Simulated Payment Received 🔔',
-      `Paytm QR par ₹500 ka payment prapt hua! UTR: ${newPay.referenceNo}. Suggested candidate: Ramesh Kumar.`
+      t('payments.simulatedAlertTitle'),
+      t('payments.simulatedAlertMsg', {
+        utr: newPay.referenceNo,
+        name: 'Ramesh Kumar',
+      })
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        title="Payment Reconciliation Inbox"
-        subtitle="UPI, Paytm QR & Counter receipts"
+        title={t('payments.headerTitle')}
+        subtitle={t('payments.headerSubtitle')}
       />
 
       <View style={styles.container}>
@@ -88,10 +99,10 @@ export default function PaymentsScreen() {
           <Ionicons name="information-circle" size={18} color={Palette.primaryBlueDark} />
           <View style={styles.providerTextCol}>
             <Text style={styles.providerTitle}>
-              Paytm Soundbox & QR Simulator Active
+              {t('payments.providerNoticeTitle')}
             </Text>
             <Text style={styles.providerSubtitle}>
-              Simulated demonstration mode. Real Paytm Webhook adapter ready for production credentials.
+              {t('payments.providerNoticeSub')}
             </Text>
           </View>
         </View>
@@ -99,20 +110,20 @@ export default function PaymentsScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Total QR Payments</Text>
+            <Text style={styles.statLabel}>{t('payments.totalQrPayments')}</Text>
             <Text style={styles.statValue}>
               {formatPaise(totalCollectedToday)}
             </Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statLabel}>Needs Reconciliation</Text>
+            <Text style={styles.statLabel}>{t('payments.needsReconciliation')}</Text>
             <Text
               style={[
                 styles.statValue,
                 { color: unmatchedCount > 0 ? Palette.warningAmber : Palette.successGreen },
               ]}
             >
-              {unmatchedCount} Unmatched
+              {t('payments.unmatchedCount', { count: unmatchedCount })}
             </Text>
           </View>
         </View>
@@ -122,11 +133,11 @@ export default function PaymentsScreen() {
           <Pressable
             style={styles.simulateBtn}
             onPress={handleSimulatePayment}
-            accessibilityLabel="Simulate incoming ₹500 payment"
+            accessibilityLabel={t('payments.simulateBtn')}
           >
             <Ionicons name="flash" size={16} color={Palette.white} />
             <Text style={styles.simulateBtnText}>
-              + Simulate ₹500 QR Payment (Test Demo)
+              {t('payments.simulateBtn')}
             </Text>
           </Pressable>
         </View>
@@ -146,7 +157,7 @@ export default function PaymentsScreen() {
                 activeFilter === 'ALL' && styles.filterTextActive,
               ]}
             >
-              All Events ({paymentEvents.length})
+              {t('payments.tabAll', { count: paymentEvents.length })}
             </Text>
           </Pressable>
 
@@ -163,7 +174,7 @@ export default function PaymentsScreen() {
                 activeFilter === 'UNMATCHED' && styles.filterTextActive,
               ]}
             >
-              Unmatched ({unmatchedCount})
+              {t('payments.tabUnmatched', { count: unmatchedCount })}
             </Text>
           </Pressable>
 
@@ -180,7 +191,9 @@ export default function PaymentsScreen() {
                 activeFilter === 'RECONCILED' && styles.filterTextActive,
               ]}
             >
-              Reconciled ({paymentEvents.filter((p) => p.status === 'RECONCILED').length})
+              {t('payments.tabReconciled', {
+                count: paymentEvents.filter((p) => p.status === 'RECONCILED').length,
+              })}
             </Text>
           </Pressable>
         </View>
@@ -205,9 +218,9 @@ export default function PaymentsScreen() {
                 size={48}
                 color={Palette.successGreen}
               />
-              <Text style={styles.emptyTitle}>All Payments Reconciled</Text>
+              <Text style={styles.emptyTitle}>{t('payments.allSettledTitle')}</Text>
               <Text style={styles.emptySub}>
-                Sabhi aane wale payments customer khata mein jud chuke hain.
+                {t('payments.allSettledSub')}
               </Text>
             </View>
           }

@@ -11,12 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Header } from '@/components/Header';
 import { formatPaise } from '@/utils/format';
 
 export default function InsightsScreen() {
   const router = useRouter();
-  const { briefing, inventory, customers } = useApp();
+  const { t } = useLanguage();
+  const { briefing, inventory, customers, merchant } = useApp();
 
   const lowStockItems = inventory.filter((i) => i.isLowStock);
 
@@ -31,8 +33,8 @@ export default function InsightsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        title="AI Business Briefing & Insights"
-        subtitle="Performance, margins & stock health"
+        title={t('insights.headerTitle')}
+        subtitle={t('insights.headerSubtitle')}
       />
 
       <ScrollView
@@ -47,70 +49,62 @@ export default function InsightsScreen() {
               <Ionicons name="sparkles" size={18} color={Palette.white} />
             </View>
             <View>
-              <Text style={styles.briefingTitle}>Daily Business Briefing</Text>
+              <Text style={styles.briefingTitle}>{t('insights.briefingTitle')}</Text>
               <Text style={styles.briefingSubtitle}>
-                AI summary for Rajesh Sharma • Updated today
+                {t('insights.briefingSubtitle', { name: merchant?.merchantName || 'Rajesh Sharma' })}
               </Text>
             </View>
           </View>
 
           <Text style={styles.briefingNarrative}>
-            Aaj aapki dukan par{' '}
-            <Text style={styles.boldText}>
-              {formatPaise(briefing.totalSalesPaise)}
-            </Text>{' '}
-            ki bikri hui hai. Cash aur UPI se{' '}
-            <Text style={styles.boldText}>
-              {formatPaise(briefing.totalCollectedPaise)}
-            </Text>{' '}
-            jama hue hain. Kul{' '}
-            <Text style={styles.boldText}>
-              {formatPaise(briefing.totalOutstandingPaise)}
-            </Text>{' '}
-            udhaar baaki hai.
+            {t('insights.briefingNarrative', {
+              sales: formatPaise(briefing.totalSalesPaise),
+              collected: formatPaise(briefing.totalCollectedPaise),
+              due: formatPaise(briefing.totalOutstandingPaise),
+            })}
           </Text>
         </View>
 
         {/* Financial KPI Cards */}
         <View style={styles.kpiGrid}>
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Total Sales (Bikri)</Text>
+            <Text style={styles.kpiLabel}>{t('insights.kpiSales')}</Text>
             <Text style={styles.kpiValue}>
               {formatPaise(briefing.totalSalesPaise)}
             </Text>
-            <Text style={styles.kpiSub}>Estimated gross</Text>
+            <Text style={styles.kpiSub}>{t('insights.kpiSalesSub')}</Text>
           </View>
 
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Collected (Aaya Paisa)</Text>
+            <Text style={styles.kpiLabel}>{t('insights.kpiCollected')}</Text>
             <Text style={[styles.kpiValue, { color: Palette.successGreen }]}>
               {formatPaise(briefing.totalCollectedPaise)}
             </Text>
-            <Text style={styles.kpiSub}>UPI & Cash</Text>
+            <Text style={styles.kpiSub}>{t('insights.kpiCollectedSub')}</Text>
           </View>
 
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Gross Margin (Munafa)</Text>
+            <Text style={styles.kpiLabel}>{t('insights.kpiMargin')}</Text>
             <Text style={[styles.kpiValue, { color: Palette.primaryBlueDark }]}>
               {formatPaise(briefing.estimatedGrossProfitPaise)}
             </Text>
-            <Text style={styles.kpiSub}>~19.8% avg margin</Text>
+            <Text style={styles.kpiSub}>{t('insights.kpiMarginSub')}</Text>
           </View>
 
           <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>Shop Expenses</Text>
+            <Text style={styles.kpiLabel}>{t('insights.kpiExpenses')}</Text>
             <Text style={[styles.kpiValue, { color: Palette.dangerRed }]}>
               {formatPaise(briefing.totalExpensesPaise)}
             </Text>
-            <Text style={styles.kpiSub}>Electricity & helper</Text>
+            <Text style={styles.kpiSub}>{t('insights.kpiExpensesSub')}</Text>
           </View>
         </View>
 
         {/* Collection Efficiency Ratio Bar */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Collection Efficiency</Text>
-            <Text style={styles.rateBadge}>{collectionRate}% Recovered</Text>
+            <Text style={styles.sectionTitle}>{t('insights.collectionEfficiency')}</Text>
+            <Text style={styles.rateBadge}>{t('insights.recovered', { rate: collectionRate })}</Text>
           </View>
           <View style={styles.progressBarBg}>
             <View
@@ -119,10 +113,10 @@ export default function InsightsScreen() {
           </View>
           <View style={styles.progressLegendRow}>
             <Text style={styles.legendText}>
-              Collected: {formatPaise(briefing.totalCollectedPaise)}
+              {t('insights.collectedLegend', { amount: formatPaise(briefing.totalCollectedPaise) })}
             </Text>
             <Text style={styles.legendText}>
-              Udhaar Pending: {formatPaise(briefing.totalOutstandingPaise)}
+              {t('insights.dueLegend', { amount: formatPaise(briefing.totalOutstandingPaise) })}
             </Text>
           </View>
         </View>
@@ -132,10 +126,12 @@ export default function InsightsScreen() {
           <View style={styles.sectionHeaderRow}>
             <View style={styles.leakHeaderLeft}>
               <Ionicons name="warning" size={18} color={Palette.warningAmber} />
-              <Text style={styles.sectionTitle}>Profit Leak Detector</Text>
+              <Text style={styles.sectionTitle}>{t('insights.profitLeakTitle')}</Text>
             </View>
             <View style={styles.alertPill}>
-              <Text style={styles.alertPillText}>2 ALERTS</Text>
+              <Text style={styles.alertPillText}>
+                {t('insights.profitLeakAlerts', { count: briefing.profitLeakAlerts.length })}
+              </Text>
             </View>
           </View>
 
@@ -157,10 +153,10 @@ export default function InsightsScreen() {
           <View style={styles.sectionHeaderRow}>
             <View style={styles.leakHeaderLeft}>
               <Ionicons name="cube" size={18} color={Palette.dangerRed} />
-              <Text style={styles.sectionTitle}>Low-Stock Warnings</Text>
+              <Text style={styles.sectionTitle}>{t('insights.lowStockTitle')}</Text>
             </View>
             <Text style={styles.stockCountText}>
-              {lowStockItems.length} Products Low
+              {t('insights.lowStockCount', { count: lowStockItems.length })}
             </Text>
           </View>
 
@@ -169,18 +165,18 @@ export default function InsightsScreen() {
               <View style={styles.stockInfoCol}>
                 <Text style={styles.stockName}>{item.name}</Text>
                 <Text style={styles.stockSupplier}>
-                  {item.hindiName} • Supplier: {item.supplierName}
+                  {item.hindiName} • {t('insights.supplier', { name: item.supplierName || '' })}
                 </Text>
               </View>
 
               <View style={styles.stockQtyCol}>
                 <View style={styles.stockAlertBadge}>
                   <Text style={styles.stockAlertText}>
-                    Only {item.currentStock} {item.unit}
+                    {t('insights.onlyStock', { qty: item.currentStock, unit: item.unit })}
                   </Text>
                 </View>
                 <Text style={styles.stockMinText}>
-                  Min threshold: {item.minStockThreshold}
+                  {t('insights.minThreshold', { threshold: item.minStockThreshold })}
                 </Text>
               </View>
             </View>
@@ -189,9 +185,9 @@ export default function InsightsScreen() {
 
         {/* Actionable Follow-up Card */}
         <View style={styles.actionCard}>
-          <Text style={styles.actionCardTitle}>Recommended Next Action</Text>
+          <Text style={styles.actionCardTitle}>{t('insights.recActionTitle')}</Text>
           <Text style={styles.actionCardDesc}>
-            Suresh Verma's ₹1,250 udhaar has been pending for 12 days. Tap below to send a polite WhatsApp reminder.
+            {t('insights.recActionDesc')}
           </Text>
           <Pressable
             style={styles.actionButton}
@@ -199,7 +195,7 @@ export default function InsightsScreen() {
           >
             <Ionicons name="logo-whatsapp" size={18} color={Palette.white} />
             <Text style={styles.actionButtonText}>
-              Open Suresh Verma Khata & Remind
+              {t('insights.openKhataRemindBtn', { name: 'Suresh Verma' })}
             </Text>
           </Pressable>
         </View>
@@ -208,7 +204,7 @@ export default function InsightsScreen() {
         <View style={styles.footerNote}>
           <Ionicons name="sparkles" size={14} color={Palette.textMuted} />
           <Text style={styles.footerNoteText}>
-            DukaanSaathi AI Engine • Deterministic Metrics + Gemini Explanation
+            {t('insights.engineNote')}
           </Text>
         </View>
       </ScrollView>

@@ -3,8 +3,11 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { Palette } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function TabLayout() {
+  const { t } = useLanguage();
+
   return (
     <Tabs
       screenOptions={{
@@ -33,8 +36,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarLabel: 'Home',
+          title: t('tabs.home'),
+          tabBarLabel: t('tabs.home'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'home' : 'home-outline'}
@@ -47,8 +50,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="khata"
         options={{
-          title: 'Khata',
-          tabBarLabel: 'Khata',
+          title: t('tabs.khata'),
+          tabBarLabel: t('tabs.khata'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'book' : 'book-outline'}
@@ -61,8 +64,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Payments',
-          tabBarLabel: 'Payments',
+          title: t('tabs.payments'),
+          tabBarLabel: t('tabs.payments'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'qr-code' : 'qr-code-outline'}
@@ -75,8 +78,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="insights"
         options={{
-          title: 'Insights',
-          tabBarLabel: 'Insights',
+          title: t('tabs.insights'),
+          tabBarLabel: t('tabs.insights'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'bar-chart' : 'bar-chart-outline'}

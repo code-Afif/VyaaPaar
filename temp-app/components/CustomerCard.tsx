@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '@/constants/Colors';
 import { Customer } from '@/types';
 import { formatPaise } from '@/utils/format';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface CustomerCardProps {
   customer: Customer;
@@ -11,6 +12,7 @@ interface CustomerCardProps {
 }
 
 export const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onPress }) => {
+  const { t } = useLanguage();
   const hasDue = customer.currentBalancePaise > 0;
 
   // Extract initials
@@ -60,7 +62,7 @@ export const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onPress })
             </Text>
           )}
           <Text style={styles.lastActivity} numberOfLines={1}>
-            Last: {customer.lastActivityDate}
+            {t('card.lastActivity', { date: customer.lastActivityDate })}
           </Text>
         </View>
       </View>
@@ -80,7 +82,7 @@ export const CustomerCard: React.FC<CustomerCardProps> = ({ customer, onPress })
             { color: hasDue ? Palette.dangerRed : Palette.successGreen },
           ]}
         >
-          {hasDue ? 'Lene Hain' : 'Chukta (No Due)'}
+          {hasDue ? t('card.due') : t('card.settled')}
         </Text>
         <Ionicons
           name="chevron-forward"
@@ -132,16 +134,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: Palette.darkNavy,
-    marginBottom: 2,
   },
   phone: {
     fontSize: 12,
     color: Palette.textSecondary,
-    marginBottom: 2,
+    marginTop: 2,
   },
   lastActivity: {
     fontSize: 11,
     color: Palette.textMuted,
+    marginTop: 3,
   },
   rightCol: {
     alignItems: 'flex-end',
@@ -150,14 +152,13 @@ const styles = StyleSheet.create({
   balanceAmount: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: -0.3,
   },
   balanceLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
   },
   chevron: {
-    marginTop: 4,
+    marginTop: 2,
   },
 });

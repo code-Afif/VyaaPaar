@@ -16,12 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { TransactionItem } from '@/components/TransactionItem';
 import { formatPaise, rupeesToPaise } from '@/utils/format';
 
 export default function CustomerDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useLanguage();
   const {
     getCustomerById,
     getCustomerLedger,
@@ -46,9 +48,9 @@ export default function CustomerDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.notFoundContainer}>
-          <Text style={styles.notFoundText}>Customer not found</Text>
+          <Text style={styles.notFoundText}>{t('customerDetail.notFoundTitle')}</Text>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>Go Back</Text>
+            <Text style={styles.backBtnText}>{t('customerDetail.notFoundBtn')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -60,21 +62,21 @@ export default function CustomerDetailScreen() {
   const handleOpenTransactionModal = (type: 'CREDIT_SALE' | 'REPAYMENT') => {
     setModalType(type);
     setAmountRupees('');
-    setDescription(type === 'CREDIT_SALE' ? 'Kirana samaan' : 'Counter cash payment');
+    setDescription(type === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder'));
   };
 
   const handleSaveTransaction = () => {
     const rupees = parseFloat(amountRupees);
     if (isNaN(rupees) || rupees <= 0) {
-      Alert.alert('Amount Required', 'Kripya sahi raqam (₹) enter karein.');
+      Alert.alert(t('home.amountRequiredTitle'), t('home.amountRequiredMsg'));
       return;
     }
 
     const amountPaise = rupeesToPaise(rupees);
     if (modalType === 'CREDIT_SALE') {
-      recordCreditSale(customer.id, amountPaise, description, 'MANUAL');
+      recordCreditSale(customer.id, amountPaise, description || t('card.creditSaleType'), 'MANUAL');
     } else {
-      recordRepayment(customer.id, amountPaise, description, 'MANUAL');
+      recordRepayment(customer.id, amountPaise, description || t('card.repaymentType'), 'MANUAL');
     }
 
     setModalType(null);
@@ -83,7 +85,13 @@ export default function CustomerDetailScreen() {
 
   const handleOpenReminder = () => {
     const dueAmount = formatPaise(customer.currentBalancePaise);
-    const text = `नमस्ते ${customer.name} जी, ${merchant.storeName} पर आपका ${dueAmount} का पिछला उधार बाकी है। कृपया समय पर भुगतान करने का कष्ट करें। UPI ID: ${merchant.upiId}। धन्यवाद! - ${merchant.merchantName}`;
+    const text = t('customerDetail.reminderTemplate', {
+      name: customer.name,
+      storeName: merchant.storeName,
+      amount: dueAmount,
+      upiId: merchant.upiId,
+      merchantName: merchant.merchantName,
+    });
     setReminderText(text);
     setReminderModalVisible(true);
   };
@@ -92,12 +100,12 @@ export default function CustomerDetailScreen() {
     try {
       await Share.share({
         message: reminderText,
-        title: `Udhaar Reminder - ${merchant.storeName}`,
+        title: `${t('customerDetail.reminderModalTitle')} - ${merchant.storeName}`,
       });
       setReminderModalVisible(false);
       Alert.alert(
-        'Reminder Shared',
-        'Customer ko reminder message share kiya gaya.'
+        t('customerDetail.reminderSuccessTitle'),
+        t('customerDetail.reminderSuccessMsg')
       );
     } catch (error) {
       console.log('Error sharing:', error);
@@ -153,7 +161,7 @@ export default function CustomerDetailScreen() {
           <View style={styles.balanceTopRow}>
             <View>
               <Text style={styles.balanceLabel}>
-                {hasDue ? 'Lene Hain (Outstanding Udhaar)' : 'Khata Chukta (Settled)'}
+                {hasDue ? t('customerDetail.totalDue') : t('customerDetail.settled')}
               </Text>
               <Text
                 style={[
@@ -171,7 +179,7 @@ export default function CustomerDetailScreen() {
                 onPress={handleOpenReminder}
               >
                 <Ionicons name="logo-whatsapp" size={16} color={Palette.white} />
-                <Text style={styles.reminderButtonText}>Remind</Text>
+                <Text style={styles.reminderButtonText}>{t('customerDetail.remindBtn')}</Text>
               </Pressable>
             )}
           </View>
@@ -180,14 +188,14 @@ export default function CustomerDetailScreen() {
 
           <View style={styles.totalsRow}>
             <View style={styles.totalCol}>
-              <Text style={styles.totalSub}>Kul Udhaar Diya</Text>
+              <Text style={styles.totalSub}>{t('customerDetail.totalCredit')}</Text>
               <Text style={styles.totalCredit}>
                 {formatPaise(customer.totalCreditPaise)}
               </Text>
             </View>
             <View style={styles.verticalSep} />
             <View style={styles.totalCol}>
-              <Text style={styles.totalSub}>Kul Paisa Mila</Text>
+              <Text style={styles.totalSub}>{t('customerDetail.totalRepaid')}</Text>
               <Text style={styles.totalRepayment}>
                 {formatPaise(customer.totalRepaymentPaise)}
               </Text>
@@ -202,7 +210,7 @@ export default function CustomerDetailScreen() {
             onPress={() => handleOpenTransactionModal('CREDIT_SALE')}
           >
             <Ionicons name="arrow-up" size={18} color={Palette.white} />
-            <Text style={styles.actionBtnText}>+ Udhaar Diya</Text>
+            <Text style={styles.actionBtnText}>{t('customerDetail.actionGiveCredit')}</Text>
           </Pressable>
 
           <Pressable
@@ -210,16 +218,16 @@ export default function CustomerDetailScreen() {
             onPress={() => handleOpenTransactionModal('REPAYMENT')}
           >
             <Ionicons name="arrow-down" size={18} color={Palette.white} />
-            <Text style={styles.actionBtnText}>+ Paisa Mila</Text>
+            <Text style={styles.actionBtnText}>{t('customerDetail.actionRepay')}</Text>
           </Pressable>
         </View>
 
         {/* Transaction History Section */}
         <View style={styles.historyHeader}>
           <Text style={styles.historyTitle}>
-            Khata History ({transactions.length} entries)
+            {t('customerDetail.ledgerCount', { count: transactions.length })}
           </Text>
-          <Text style={styles.historyNote}>Deterministic paise ledger</Text>
+          <Text style={styles.historyNote}>{t('customerDetail.ledgerPaiseNote')}</Text>
         </View>
 
         <View style={styles.historyCard}>
@@ -234,7 +242,7 @@ export default function CustomerDetailScreen() {
           {transactions.length === 0 && (
             <View style={styles.emptyHistory}>
               <Text style={styles.emptyHistoryText}>
-                Is grahak ki abhi koi transaction nahi hai.
+                {t('customerDetail.emptyLedger')}
               </Text>
             </View>
           )}
@@ -253,21 +261,21 @@ export default function CustomerDetailScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {modalType === 'CREDIT_SALE'
-                  ? `${customer.name} ko Udhaar Diya`
-                  : `${customer.name} se Paisa Mila`}
+                  ? t('customerDetail.modalCreditTitle', { name: customer.name })
+                  : t('customerDetail.modalRepayTitle', { name: customer.name })}
               </Text>
               <Pressable onPress={() => setModalType(null)} hitSlop={10}>
                 <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
               </Pressable>
             </View>
 
-            <Text style={styles.inputLabel}>Raqam (₹ Amount)</Text>
+            <Text style={styles.inputLabel}>{t('home.amountRupees')}</Text>
             <View style={styles.amountInputWrapper}>
               <Text style={styles.currencySymbol}>₹</Text>
               <TextInput
                 style={styles.amountInput}
                 keyboardType="numeric"
-                placeholder="300"
+                placeholder={t('home.amountPlaceholder')}
                 placeholderTextColor={Palette.textMuted}
                 value={amountRupees}
                 onChangeText={setAmountRupees}
@@ -275,10 +283,10 @@ export default function CustomerDetailScreen() {
               />
             </View>
 
-            <Text style={styles.inputLabel}>Vivaran (Description / Note)</Text>
+            <Text style={styles.inputLabel}>{t('home.description')}</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="e.g. Atta, Tel, Dal, Spices"
+              placeholder={modalType === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder')}
               placeholderTextColor={Palette.textMuted}
               value={description}
               onChangeText={setDescription}
@@ -298,8 +306,8 @@ export default function CustomerDetailScreen() {
             >
               <Text style={styles.modalSubmitText}>
                 {modalType === 'CREDIT_SALE'
-                  ? 'Confirm Udhaar Entry'
-                  : 'Confirm Repayment Entry'}
+                  ? t('customerDetail.confirmCreditBtn')
+                  : t('customerDetail.confirmRepayBtn')}
               </Text>
             </Pressable>
           </View>
@@ -318,7 +326,7 @@ export default function CustomerDetailScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.reminderHeaderRow}>
                 <Ionicons name="logo-whatsapp" size={22} color={Palette.successGreen} />
-                <Text style={styles.modalTitle}>Send Udhaar Reminder</Text>
+                <Text style={styles.modalTitle}>{t('customerDetail.reminderModalTitle')}</Text>
               </View>
               <Pressable onPress={() => setReminderModalVisible(false)} hitSlop={10}>
                 <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
@@ -326,7 +334,7 @@ export default function CustomerDetailScreen() {
             </View>
 
             <Text style={styles.inputLabel}>
-              Editable Reminder Message (Hindi/Hinglish):
+              {t('customerDetail.editableMsgLabel')}
             </Text>
             <TextInput
               style={styles.textAreaInput}
@@ -342,7 +350,7 @@ export default function CustomerDetailScreen() {
                 onPress={handleSendViaShare}
               >
                 <Ionicons name="share-social" size={18} color={Palette.darkNavy} />
-                <Text style={styles.shareFallbackText}>Share Sheet</Text>
+                <Text style={styles.shareFallbackText}>{t('customerDetail.shareFallbackBtn')}</Text>
               </Pressable>
 
               <Pressable
@@ -350,7 +358,7 @@ export default function CustomerDetailScreen() {
                 onPress={handleSendViaWhatsApp}
               >
                 <Ionicons name="logo-whatsapp" size={18} color={Palette.white} />
-                <Text style={styles.whatsappSendText}>Send on WhatsApp</Text>
+                <Text style={styles.whatsappSendText}>{t('customerDetail.whatsappSendBtn')}</Text>
               </Pressable>
             </View>
           </View>

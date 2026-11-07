@@ -5,7 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { Language } from '@/i18n';
 
 export default function ModalScreen() {
   const router = useRouter();
@@ -17,19 +19,20 @@ export default function ModalScreen() {
     signOut,
     seedCurrentSupabaseAccount,
   } = useApp();
+  const { language, setLanguage, t } = useLanguage();
 
   const handleResetData = () => {
     Alert.alert(
-      'Reset Demo Data?',
-      'Kya aap sabhi sample customer transactions aur payments ko reset karna chahte hain?',
+      t('settings.resetConfirmTitle'),
+      t('settings.resetConfirmMsg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset Karein',
+          text: t('settings.resetBtn'),
           style: 'destructive',
           onPress: () => {
             resetToDemoSeed();
-            Alert.alert('Reset Complete', 'Demo data initial state par reset ho gaya hai.');
+            Alert.alert(t('settings.resetCompleteTitle'), t('settings.resetCompleteMsg'));
             router.back();
           },
         },
@@ -39,19 +42,19 @@ export default function ModalScreen() {
 
   const handleSeedSupabase = async () => {
     Alert.alert(
-      'Seed Demo Data to Supabase?',
-      'Kya aap apne authenticated Supabase account mein 5 sample customers aur transactions load karna chahte hain?',
+      t('settings.seedConfirmTitle'),
+      t('settings.seedConfirmMsg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Seed Karein',
+          text: t('settings.seedBtn'),
           onPress: async () => {
             const success = await seedCurrentSupabaseAccount();
             if (success) {
-              Alert.alert('Success 🎉', 'Demo data aapke Supabase account mein load ho gaya.');
+              Alert.alert(t('settings.seedSuccessTitle'), t('settings.seedSuccessMsg'));
               router.back();
             } else {
-              Alert.alert('Error', 'Seed procedure execute nahi ho payi. Database schema check karein.');
+              Alert.alert(t('settings.seedErrorTitle'), t('settings.seedErrorMsg'));
             }
           },
         },
@@ -60,10 +63,10 @@ export default function ModalScreen() {
   };
 
   const handleSignOut = async () => {
-    Alert.alert('Sign Out', 'Kya aap DukaanSaathi se sign out karna chahte hain?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.signOutConfirmTitle'), t('settings.signOutConfirmMsg'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('settings.signOutBtn'),
         style: 'destructive',
         onPress: async () => {
           await signOut();
@@ -73,12 +76,18 @@ export default function ModalScreen() {
     ]);
   };
 
+  const languages: { code: Language; label: string }[] = [
+    { code: 'en', label: 'English' },
+    { code: 'hi', label: 'हिन्दी' },
+    { code: 'hinglish', label: 'Hinglish' },
+  ];
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Store Info & Settings</Text>
-        <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={10}>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+        <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={10} accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={Palette.darkNavy} />
         </Pressable>
       </View>
@@ -112,31 +121,62 @@ export default function ModalScreen() {
                     },
                   ]}
                 >
-                  {isAuthenticated ? 'SUPABASE CLOUD' : 'DEMO MODE'}
+                  {isAuthenticated ? t('header.cloud') : t('header.demo')}
                 </Text>
               </View>
             </View>
-            <Text style={styles.merchantName}>Proprietor: {merchant.merchantName}</Text>
-            {userEmail && <Text style={styles.emailText}>Account: {userEmail}</Text>}
+            <Text style={styles.merchantName}>{t('settings.proprietor', { name: merchant.merchantName })}</Text>
+            {userEmail && <Text style={styles.emailText}>{t('settings.account', { email: userEmail })}</Text>}
             <Text style={styles.city}>{merchant.city} • {merchant.phone}</Text>
-            <Text style={styles.upiId}>Paytm UPI: {merchant.upiId}</Text>
+            <Text style={styles.upiId}>{t('settings.paytmUpi', { upi: merchant.upiId })}</Text>
+          </View>
+        </View>
+
+        {/* App Language Section */}
+        <View style={styles.cardSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="globe-outline" size={18} color={Palette.primaryBlueDark} />
+            <Text style={styles.sectionHeading}>{t('settings.languageHeading')}</Text>
+          </View>
+          <Text style={styles.sectionSubHeading}>{t('settings.languageSub')}</Text>
+
+          <View style={styles.langPillsRow}>
+            {languages.map((l) => {
+              const isActive = language === l.code;
+              return (
+                <Pressable
+                  key={l.code}
+                  style={[styles.langPill, isActive && styles.langPillActive]}
+                  onPress={() => setLanguage(l.code)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                >
+                  <Text style={[styles.langPillText, isActive && styles.langPillTextActive]}>
+                    {l.label}
+                  </Text>
+                  {isActive && (
+                    <Ionicons name="checkmark-circle" size={14} color={Palette.white} />
+                  )}
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
         {/* Auth / Account Management Section */}
         <View style={styles.authSection}>
-          <Text style={styles.sectionHeading}>Account & Backend State</Text>
+          <Text style={styles.sectionHeading}>{t('settings.accountStateHeading')}</Text>
 
           {isAuthenticated ? (
             <View style={styles.authActionsCol}>
               <Pressable style={styles.seedBtn} onPress={handleSeedSupabase}>
                 <Ionicons name="cloud-upload" size={18} color={Palette.primaryBlueDark} />
-                <Text style={styles.seedBtnText}>Seed Sample Data to Supabase</Text>
+                <Text style={styles.seedBtnText}>{t('settings.seedBtn')}</Text>
               </Pressable>
 
               <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
                 <Ionicons name="log-out" size={18} color={Palette.dangerRed} />
-                <Text style={styles.signOutBtnText}>Sign Out of Store Account</Text>
+                <Text style={styles.signOutBtnText}>{t('settings.signOutBtn')}</Text>
               </Pressable>
             </View>
           ) : (
@@ -149,52 +189,22 @@ export default function ModalScreen() {
               >
                 <Ionicons name="person-circle" size={20} color={Palette.white} />
                 <Text style={styles.signInBtnText}>
-                  Sign In or Register with Supabase
+                  {t('settings.signInBtn')}
                 </Text>
               </Pressable>
               <Text style={styles.authHint}>
                 {isSupabaseConfigured()
-                  ? 'Supabase backend is configured and ready.'
-                  : 'Supabase credentials absent: running smoothly in offline Demo Mode.'}
+                  ? t('settings.supabaseReady')
+                  : t('settings.demoHint')}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Integration Status Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>DukaanSaathi Build Status</Text>
-
-          <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.successGreen} />
-            <Text style={styles.statusText}>Phase 1: React Native Mobile UI & 4-Tab Navigation</Text>
-          </View>
-
-          <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.successGreen} />
-            <Text style={styles.statusText}>Phase 2: Supabase Migrations, Schema & RLS</Text>
-          </View>
-
-          <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.successGreen} />
-            <Text style={styles.statusText}>Append-Only Ledger with Idempotency Key</Text>
-          </View>
-
-          <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.successGreen} />
-            <Text style={styles.statusText}>Multi-Tenant Customer & Transaction Isolation</Text>
-          </View>
-
-          <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle" size={16} color={Palette.successGreen} />
-            <Text style={styles.statusText}>Paytm Soundbox QR Simulator & Reconciler</Text>
-          </View>
-        </View>
-
         {/* Reset Demo Data Button */}
         <Pressable style={styles.resetButton} onPress={handleResetData}>
           <Ionicons name="refresh" size={18} color={Palette.dangerRed} />
-          <Text style={styles.resetButtonText}>Reset Demo Transactions</Text>
+          <Text style={styles.resetButtonText}>{t('settings.resetBtn')}</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -296,6 +306,59 @@ const styles = StyleSheet.create({
     color: Palette.darkNavy,
     marginTop: 3,
   },
+  cardSection: {
+    backgroundColor: Palette.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionHeading: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Palette.darkNavy,
+  },
+  sectionSubHeading: {
+    fontSize: 12,
+    color: Palette.textSecondary,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  langPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  langPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: Palette.background,
+    borderWidth: 1.5,
+    borderColor: Palette.border,
+    gap: 6,
+  },
+  langPillActive: {
+    backgroundColor: Palette.primaryBlue,
+    borderColor: Palette.primaryBlue,
+  },
+  langPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Palette.darkNavy,
+  },
+  langPillTextActive: {
+    color: Palette.white,
+  },
   authSection: {
     backgroundColor: Palette.white,
     borderRadius: 14,
@@ -304,14 +367,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
   },
-  sectionHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-    marginBottom: 12,
-  },
   authActionsCol: {
     gap: 10,
+    marginTop: 12,
   },
   signInBtn: {
     backgroundColor: Palette.primaryBlue,
@@ -363,31 +421,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Palette.textSecondary,
     textAlign: 'center',
-  },
-  infoBox: {
-    backgroundColor: Palette.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 16,
-    marginBottom: 20,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-    marginBottom: 12,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  statusText: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-    flex: 1,
+    marginTop: 4,
   },
   resetButton: {
     backgroundColor: Palette.white,

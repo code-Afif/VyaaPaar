@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Header } from '@/components/Header';
 import { CustomerCard } from '@/components/CustomerCard';
 import { formatPaise } from '@/utils/format';
@@ -21,6 +22,7 @@ type FilterTab = 'ALL' | 'DUE' | 'SETTLED';
 export default function KhataScreen() {
   const router = useRouter();
   const { customers, briefing, refreshFromSupabase } = useApp();
+  const { t } = useLanguage();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<FilterTab>('ALL');
@@ -58,24 +60,24 @@ export default function KhataScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <Header
-        title="Grahak Khata (Customer Ledger)"
-        subtitle="Manage customer credit & repayments"
+        title={t('khata.headerTitle')}
+        subtitle={t('khata.headerSubtitle')}
       />
 
       <View style={styles.container}>
         {/* Khata Balance Summary Card */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryCol}>
-            <Text style={styles.summaryLabel}>Total Udhaar (Lene Hain)</Text>
+            <Text style={styles.summaryLabel}>{t('khata.totalUdhaar')}</Text>
             <Text style={styles.summaryAmount}>
               {formatPaise(briefing.totalOutstandingPaise)}
             </Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryColRight}>
-            <Text style={styles.summaryLabel}>Total Grahak</Text>
+            <Text style={styles.summaryLabel}>{t('khata.totalCustomers')}</Text>
             <Text style={styles.customerCountText}>
-              {customers.length} Grahak
+              {t('khata.customerCount', { count: customers.length })}
             </Text>
           </View>
         </View>
@@ -86,7 +88,7 @@ export default function KhataScreen() {
             <Ionicons name="search" size={18} color={Palette.textSecondary} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by name or mobile number..."
+              placeholder={t('khata.searchPlaceholder')}
               placeholderTextColor={Palette.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -101,10 +103,10 @@ export default function KhataScreen() {
           <Pressable
             style={styles.addCustomerBtn}
             onPress={() => router.push('/customer/new')}
-            accessibilityLabel="Add new customer"
+            accessibilityLabel={t('khata.addCustomerBtn')}
           >
             <Ionicons name="person-add" size={18} color={Palette.white} />
-            <Text style={styles.addCustomerBtnText}>+ Naya</Text>
+            <Text style={styles.addCustomerBtnText}>{t('khata.addCustomerBtn')}</Text>
           </Pressable>
         </View>
 
@@ -120,7 +122,7 @@ export default function KhataScreen() {
                 filterTab === 'ALL' && styles.tabTextActive,
               ]}
             >
-              Sabhi ({customers.length})
+              {t('khata.tabAll', { count: customers.length })}
             </Text>
           </Pressable>
 
@@ -134,15 +136,14 @@ export default function KhataScreen() {
                 filterTab === 'DUE' && styles.tabTextActive,
               ]}
             >
-              Lene Hain ({customers.filter((c) => c.currentBalancePaise > 0).length})
+              {t('khata.tabDue', {
+                count: customers.filter((c) => c.currentBalancePaise > 0).length,
+              })}
             </Text>
           </Pressable>
 
           <Pressable
-            style={[
-              styles.tabChip,
-              filterTab === 'SETTLED' && styles.tabChipActive,
-            ]}
+            style={[styles.tabChip, filterTab === 'SETTLED' && styles.tabChipActive]}
             onPress={() => setFilterTab('SETTLED')}
           >
             <Text
@@ -151,7 +152,9 @@ export default function KhataScreen() {
                 filterTab === 'SETTLED' && styles.tabTextActive,
               ]}
             >
-              Chukta ({customers.filter((c) => c.currentBalancePaise === 0).length})
+              {t('khata.tabSettled', {
+                count: customers.filter((c) => c.currentBalancePaise === 0).length,
+              })}
             </Text>
           </Pressable>
         </View>
@@ -177,15 +180,15 @@ export default function KhataScreen() {
                 size={48}
                 color={Palette.textMuted}
               />
-              <Text style={styles.emptyTitle}>Koi Grahak Nahi Mila</Text>
+              <Text style={styles.emptyTitle}>{t('khata.emptyTitle')}</Text>
               <Text style={styles.emptySub}>
-                Naya grahak jodne ke liye upar '+ Naya' button dabayein.
+                {t('khata.emptySub')}
               </Text>
               <Pressable
                 style={styles.emptyButton}
                 onPress={() => router.push('/customer/new')}
               >
-                <Text style={styles.emptyButtonText}>+ Add New Customer</Text>
+                <Text style={styles.emptyButtonText}>{t('khata.emptyBtn')}</Text>
               </Pressable>
             </View>
           }
@@ -210,7 +213,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -218,36 +221,38 @@ const styles = StyleSheet.create({
   summaryCol: {
     flex: 1,
   },
-  summaryColRight: {
-    alignItems: 'flex-end',
+  summaryLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  summaryAmount: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Palette.dangerRed,
   },
   summaryDivider: {
     width: 1,
     height: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#334E68',
     marginHorizontal: 16,
   },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#9FB3C8',
-    marginBottom: 4,
-  },
-  summaryAmount: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Palette.white,
-    letterSpacing: -0.5,
+  summaryColRight: {
+    alignItems: 'flex-end',
   },
   customerCountText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#E2E8F0',
+    color: Palette.white,
   },
   searchRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 8,
-    gap: 8,
+    gap: 10,
+    alignItems: 'center',
   },
   searchInputWrapper: {
     flex: 1,
@@ -255,25 +260,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Palette.white,
     borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 42,
     borderWidth: 1,
     borderColor: Palette.border,
-    paddingHorizontal: 12,
     gap: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 9,
     fontSize: 13,
     color: Palette.textPrimary,
   },
   addCustomerBtn: {
     backgroundColor: Palette.primaryBlue,
     borderRadius: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
   },
   addCustomerBtnText: {
     color: Palette.white,
@@ -295,7 +301,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.border,
   },
   tabChipActive: {
-    backgroundColor: Palette.primaryBlueLight,
+    backgroundColor: Palette.primaryBlue,
     borderColor: Palette.primaryBlue,
   },
   tabText: {
@@ -304,7 +310,7 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
   },
   tabTextActive: {
-    color: Palette.primaryBlueDark,
+    color: Palette.white,
     fontWeight: '700',
   },
   listContent: {
@@ -313,8 +319,8 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    marginTop: 40,
+    paddingVertical: 48,
+    paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 16,
@@ -327,11 +333,12 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     textAlign: 'center',
     marginTop: 6,
-    marginBottom: 16,
+    lineHeight: 18,
   },
   emptyButton: {
+    marginTop: 18,
     backgroundColor: Palette.primaryBlue,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
   },

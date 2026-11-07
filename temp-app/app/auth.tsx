@@ -15,11 +15,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 export default function AuthScreen() {
   const router = useRouter();
   const { completeLogin, setDemoMode } = useApp();
+  const { t, language } = useLanguage();
 
   // Authentication mode
   const [mode, setMode] = useState<'SIGN_IN' | 'SIGN_UP'>('SIGN_IN');
@@ -39,6 +41,17 @@ export default function AuthScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const getLangCodeDisplay = () => {
+    switch (language) {
+      case 'hi':
+        return 'हिन्दी';
+      case 'hinglish':
+        return 'Hinglish';
+      default:
+        return 'English';
+    }
+  };
+
   /**
    * Handle Email + Password Submission
    * Pure password-only authentication flow using Supabase Auth
@@ -53,26 +66,24 @@ export default function AuthScreen() {
     // Validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-      setErrorMessage('Please enter a valid email address (Sahi email enter karein).');
+      setErrorMessage(t('auth.errorInvalidEmail'));
       return;
     }
 
     if (!cleanPassword || cleanPassword.length < 6) {
-      setErrorMessage('Password must be at least 6 characters (Password kam se kam 6 akshar ka ho).');
+      setErrorMessage(t('auth.errorPasswordLength'));
       return;
     }
 
     if (mode === 'SIGN_UP') {
       if (!storeName.trim() || !ownerName.trim()) {
-        setErrorMessage('Dukan aur malik ka naam anivarya hai (Store & Owner Name are required).');
+        setErrorMessage(t('auth.errorStoreOwnerRequired'));
         return;
       }
     }
 
     if (!isSupabaseConfigured()) {
-      setErrorMessage(
-        'Supabase backend credentials are not configured in .env.local. Please explore in Demo Mode.'
-      );
+      setErrorMessage(t('auth.errorSupabaseMissing'));
       return;
     }
 
@@ -87,13 +98,13 @@ export default function AuthScreen() {
         });
 
         if (error || !data.session) {
-          setErrorMessage(error?.message || 'Invalid email or password (Email ya Password galat hai).');
+          setErrorMessage(error?.message || t('auth.errorInvalidEmail'));
           setIsLoading(false);
           return;
         }
 
         // Authenticated successfully! Load merchant data and navigate directly to dashboard
-        setSuccessMessage('Logged in successfully! Opening store...');
+        setSuccessMessage(t('auth.successLogin'));
         await completeLogin(data.session.user.id, data.session.user.user_metadata);
         setIsLoading(false);
         router.replace('/(tabs)');
@@ -112,27 +123,25 @@ export default function AuthScreen() {
         });
 
         if (error) {
-          setErrorMessage(error.message || 'Registration failed (Khata banane mein asafal).');
+          setErrorMessage(error.message || t('common.error'));
           setIsLoading(false);
           return;
         }
 
         if (data.session) {
           // Session directly available, log in immediately
-          setSuccessMessage('Account created successfully! Opening store...');
+          setSuccessMessage(t('auth.successRegisteredDirect'));
           await completeLogin(data.session.user.id, data.session.user.user_metadata);
           setIsLoading(false);
           router.replace('/(tabs)');
         } else {
-          setSuccessMessage(
-            'Account created! If email confirmation is enabled on your Supabase project, please check your inbox and verify before signing in.'
-          );
+          setSuccessMessage(t('auth.successRegisteredVerify'));
           setMode('SIGN_IN');
           setIsLoading(false);
         }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Authentication error occurred.');
+      setErrorMessage(err.message || t('common.error'));
       setIsLoading(false);
     }
   };
@@ -156,19 +165,32 @@ export default function AuthScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Close / Back */}
+          {/* Header Close / Back & Language Switcher */}
           <View style={styles.topBar}>
             <Pressable
               onPress={() => router.back()}
               style={styles.backButton}
               hitSlop={12}
+              accessibilityLabel="Back"
             >
               <Ionicons name="close" size={24} color={Palette.darkNavy} />
             </Pressable>
 
-            <View style={styles.brandBadge}>
-              <Ionicons name="shield-checkmark" size={16} color={Palette.primaryBlueDark} />
-              <Text style={styles.brandBadgeText}>Supabase Cloud Secured</Text>
+            <View style={styles.topRightRow}>
+              {/* Language Switcher */}
+              <Pressable
+                style={styles.langBtn}
+                onPress={() => router.push('/language?from=settings')}
+                accessibilityLabel={t('common.changeLanguage')}
+              >
+                <Ionicons name="globe-outline" size={14} color={Palette.darkNavy} />
+                <Text style={styles.langBtnText}>{getLangCodeDisplay()}</Text>
+              </Pressable>
+
+              <View style={styles.brandBadge}>
+                <Ionicons name="shield-checkmark" size={15} color={Palette.primaryBlueDark} />
+                <Text style={styles.brandBadgeText}>{t('auth.cloudSecured')}</Text>
+              </View>
             </View>
           </View>
 
@@ -179,15 +201,11 @@ export default function AuthScreen() {
             </View>
 
             <Text style={styles.heroTitle}>
-              {mode === 'SIGN_IN'
-                ? 'DukaanSaathi Partner Login'
-                : 'Register New Dukaan'}
+              {mode === 'SIGN_IN' ? t('auth.titleSignIn') : t('auth.titleSignUp')}
             </Text>
 
             <Text style={styles.heroSubtitle}>
-              {mode === 'SIGN_IN'
-                ? 'Apni dukan ke accounts aur ledger access karne ke liye login karein.'
-                : 'Apni kirana dukan ke liye surakshit khata banayein.'}
+              {mode === 'SIGN_IN' ? t('auth.subtitleSignIn') : t('auth.subtitleSignUp')}
             </Text>
           </View>
 
@@ -221,7 +239,7 @@ export default function AuthScreen() {
                 <Text
                   style={[styles.toggleBtnText, mode === 'SIGN_IN' && styles.toggleBtnTextActive]}
                 >
-                  Sign In (लॉगिन)
+                  {t('auth.tabSignIn')}
                 </Text>
               </Pressable>
 
@@ -236,7 +254,7 @@ export default function AuthScreen() {
                 <Text
                   style={[styles.toggleBtnText, mode === 'SIGN_UP' && styles.toggleBtnTextActive]}
                 >
-                  Register (नया खाता)
+                  {t('auth.tabSignUp')}
                 </Text>
               </Pressable>
             </View>
@@ -245,12 +263,12 @@ export default function AuthScreen() {
             {mode === 'SIGN_UP' && (
               <>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Store Name (दुकान का नाम) *</Text>
+                  <Text style={styles.label}>{t('auth.storeNameLabel')}</Text>
                   <View style={styles.inputWrapper}>
                     <Ionicons name="business" size={18} color={Palette.textSecondary} />
                     <TextInput
                       style={styles.textInput}
-                      placeholder="e.g. Sharma Kirana Store"
+                      placeholder={t('auth.storeNamePlaceholder')}
                       placeholderTextColor={Palette.textMuted}
                       value={storeName}
                       onChangeText={setStoreName}
@@ -259,12 +277,12 @@ export default function AuthScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Proprietor Name (मालिक का नाम) *</Text>
+                  <Text style={styles.label}>{t('auth.ownerNameLabel')}</Text>
                   <View style={styles.inputWrapper}>
                     <Ionicons name="person" size={18} color={Palette.textSecondary} />
                     <TextInput
                       style={styles.textInput}
-                      placeholder="e.g. Rajesh Sharma"
+                      placeholder={t('auth.ownerNamePlaceholder')}
                       placeholderTextColor={Palette.textMuted}
                       value={ownerName}
                       onChangeText={setOwnerName}
@@ -273,12 +291,12 @@ export default function AuthScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Phone Number (मोबाइल नंबर)</Text>
+                  <Text style={styles.label}>{t('auth.phoneLabel')}</Text>
                   <View style={styles.inputWrapper}>
                     <Ionicons name="call" size={18} color={Palette.textSecondary} />
                     <TextInput
                       style={styles.textInput}
-                      placeholder="+91 98260 12345"
+                      placeholder={t('auth.phonePlaceholder')}
                       placeholderTextColor={Palette.textMuted}
                       keyboardType="phone-pad"
                       value={phone}
@@ -291,12 +309,12 @@ export default function AuthScreen() {
 
             {/* Email Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address (ईमेल) *</Text>
+              <Text style={styles.label}>{t('auth.emailLabel')}</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="mail" size={18} color={Palette.textSecondary} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="merchant@dukaan.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   placeholderTextColor={Palette.textMuted}
                   autoCapitalize="none"
                   keyboardType="email-address"
@@ -308,12 +326,12 @@ export default function AuthScreen() {
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password (पासवर्ड) *</Text>
+              <Text style={styles.label}>{t('auth.passwordLabel')}</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="lock-closed" size={18} color={Palette.textSecondary} />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Enter min. 6 characters"
+                  placeholder={t('auth.passwordPlaceholder')}
                   placeholderTextColor={Palette.textMuted}
                   secureTextEntry={!showPassword}
                   value={password}
@@ -344,9 +362,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <Text style={styles.primaryButtonText}>
-                    {mode === 'SIGN_IN'
-                      ? 'Sign In to Store (लॉगिन करें)'
-                      : 'Create Account & Continue'}
+                    {mode === 'SIGN_IN' ? t('auth.btnSignIn') : t('auth.btnSignUp')}
                   </Text>
                   <Ionicons name="arrow-forward" size={18} color={Palette.white} />
                 </>
@@ -354,7 +370,7 @@ export default function AuthScreen() {
             </Pressable>
 
             <Text style={styles.securityNote}>
-              🔒 Secure Cloud Authentication: Direct encrypted session with Supabase Row-Level Security.
+              {t('auth.cloudSecured')}
             </Text>
           </View>
 
@@ -362,19 +378,18 @@ export default function AuthScreen() {
           <View style={styles.demoModeSection}>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>YA PHIR (OR)</Text>
+              <Text style={styles.dividerText}>OR</Text>
               <View style={styles.dividerLine} />
             </View>
 
             <Pressable style={styles.demoButton} onPress={handleContinueDemo}>
               <Ionicons name="play-circle-outline" size={20} color={Palette.primaryBlueDark} />
               <Text style={styles.demoButtonText}>
-                Explore in Demo Mode (बिना लॉगिन के दुकान देखें)
+                {t('auth.exploreDemo')}
               </Text>
             </Pressable>
             <Text style={styles.demoNote}>
-              Pre-loaded with sample kirana customers, credit ledger entries, and Paytm soundbox
-              events.
+              {t('auth.demoDesc')}
             </Text>
           </View>
         </ScrollView>
@@ -404,6 +419,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
   },
+  topRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  langBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: Palette.card,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  langBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Palette.darkNavy,
+  },
   backButton: {
     padding: 6,
     borderRadius: 8,
@@ -418,18 +454,16 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primaryBlueLight,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderRadius: 8,
   },
   brandBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: Palette.primaryBlueDark,
   },
   heroSection: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
     marginBottom: 20,
   },
   iconCircle: {
@@ -437,82 +471,78 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: Palette.primaryBlueLight,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#BAE6FD',
   },
   heroTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.darkNavy,
-    textAlign: 'center',
     marginBottom: 6,
+    textAlign: 'center',
   },
   heroSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: Palette.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
     paddingHorizontal: 16,
+    lineHeight: 18,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: Palette.dangerRedLight,
-    borderColor: '#FECACA',
+    backgroundColor: '#FEE2E2',
     borderWidth: 1,
+    borderColor: '#FCA5A5',
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
+    gap: 8,
   },
   errorBannerText: {
     flex: 1,
     fontSize: 13,
     color: Palette.dangerRed,
     fontWeight: '600',
-    lineHeight: 18,
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     backgroundColor: Palette.successGreenLight,
-    borderColor: '#A7F3D0',
     borderWidth: 1,
+    borderColor: '#86EFAC',
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
+    gap: 8,
   },
   successBannerText: {
     flex: 1,
     fontSize: 13,
     color: Palette.successGreen,
     fontWeight: '600',
-    lineHeight: 18,
   },
   card: {
-    backgroundColor: Palette.card,
+    backgroundColor: Palette.white,
     borderRadius: 16,
-    padding: 20,
     borderWidth: 1,
     borderColor: Palette.border,
+    padding: 18,
     shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
     elevation: 2,
   },
   toggleRow: {
     flexDirection: 'row',
     backgroundColor: Palette.background,
     borderRadius: 10,
-    padding: 4,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    padding: 3,
+    marginBottom: 16,
   },
   toggleBtn: {
     flex: 1,
@@ -523,9 +553,9 @@ const styles = StyleSheet.create({
   toggleBtnActive: {
     backgroundColor: Palette.white,
     shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
     elevation: 1,
   },
   toggleBtnText: {
@@ -535,14 +565,14 @@ const styles = StyleSheet.create({
   },
   toggleBtnTextActive: {
     color: Palette.darkNavy,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   inputGroup: {
     marginBottom: 14,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: Palette.darkNavy,
     marginBottom: 6,
   },
@@ -550,30 +580,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Palette.background,
-    borderRadius: 10,
     borderWidth: 1,
     borderColor: Palette.border,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    height: 48,
+    gap: 8,
   },
   textInput: {
     flex: 1,
-    marginLeft: 8,
-    fontSize: 15,
+    paddingVertical: 11,
+    fontSize: 14,
     color: Palette.textPrimary,
   },
   eyeIconBtn: {
-    padding: 6,
+    padding: 4,
   },
   primaryButton: {
+    backgroundColor: Palette.primaryBlue,
+    borderRadius: 12,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Palette.darkNavy,
-    paddingVertical: 14,
-    borderRadius: 12,
     marginTop: 8,
+    marginBottom: 10,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -587,12 +618,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Palette.textMuted,
     textAlign: 'center',
-    marginTop: 12,
     lineHeight: 16,
+    marginTop: 4,
   },
   demoModeSection: {
-    marginTop: 24,
     alignItems: 'center',
+    marginTop: 20,
   },
   dividerRow: {
     flexDirection: 'row',
@@ -606,28 +637,28 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.border,
   },
   dividerText: {
+    marginHorizontal: 12,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: Palette.textMuted,
-    paddingHorizontal: 12,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   demoButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    backgroundColor: Palette.card,
+    backgroundColor: Palette.white,
     borderWidth: 1.5,
     borderColor: Palette.primaryBlue,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
     borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     width: '100%',
-    justifyContent: 'center',
   },
   demoButtonText: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     color: Palette.primaryBlueDark,
   },
   demoNote: {
@@ -635,7 +666,7 @@ const styles = StyleSheet.create({
     color: Palette.textMuted,
     textAlign: 'center',
     marginTop: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     lineHeight: 16,
   },
 });

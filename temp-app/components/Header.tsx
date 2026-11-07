@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface HeaderProps {
   title?: string;
@@ -20,6 +21,18 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const { merchant } = useApp();
+  const { language, t } = useLanguage();
+
+  const getLangCodeDisplay = () => {
+    switch (language) {
+      case 'hi':
+        return 'हि';
+      case 'hinglish':
+        return 'Hin';
+      default:
+        return 'EN';
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -40,12 +53,23 @@ export const Header: React.FC<HeaderProps> = ({
               {title || merchant.storeName}
             </Text>
             <Text style={styles.subtitle} numberOfLines={1}>
-              {subtitle || `Namaste, ${merchant.merchantName} 👋`}
+              {subtitle || t('header.defaultSubtitle', { name: merchant.merchantName })}
             </Text>
           </View>
         </View>
 
         <View style={styles.rightSection}>
+          {/* Language Switch Pill */}
+          <Pressable
+            style={styles.langBadge}
+            onPress={() => router.push('/language?from=settings')}
+            accessibilityLabel={t('common.changeLanguage')}
+          >
+            <Ionicons name="globe-outline" size={13} color={Palette.darkNavy} />
+            <Text style={styles.langBadgeText}>{getLangCodeDisplay()}</Text>
+          </Pressable>
+
+          {/* Cloud / Demo Status Pill */}
           <Pressable
             style={[
               styles.demoBadge,
@@ -72,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : null,
               ]}
             >
-              {merchant.id && !merchant.isDemoMode ? 'CLOUD' : 'DEMO'}
+              {merchant.id && !merchant.isDemoMode ? t('header.cloud') : t('header.demo')}
             </Text>
           </Pressable>
 
@@ -111,6 +135,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 8,
   },
   backButton: {
     marginRight: 10,
@@ -133,15 +158,31 @@ const styles = StyleSheet.create({
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+  },
+  langBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.background,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    gap: 4,
+  },
+  langBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.darkNavy,
   },
   demoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Palette.primaryBlueLight,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#BAE6FD',
   },
@@ -159,9 +200,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   voiceIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: Palette.primaryBlueLight,
     alignItems: 'center',
     justifyContent: 'center',

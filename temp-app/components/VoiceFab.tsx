@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface VoiceFabProps {
   compact?: boolean;
@@ -10,13 +11,14 @@ interface VoiceFabProps {
 
 export const VoiceFab: React.FC<VoiceFabProps> = ({ compact = false }) => {
   const router = useRouter();
+  const { t } = useLanguage();
 
   if (compact) {
     return (
       <Pressable
         style={styles.compactBtn}
         onPress={() => router.push('/voice')}
-        accessibilityLabel="Bol kar likhein"
+        accessibilityLabel={t('voice.tapToSpeak')}
       >
         <Ionicons name="mic" size={24} color={Palette.white} />
       </Pressable>
@@ -27,7 +29,7 @@ export const VoiceFab: React.FC<VoiceFabProps> = ({ compact = false }) => {
     <Pressable
       style={styles.bannerContainer}
       onPress={() => router.push('/voice')}
-      accessibilityLabel="AI Voice Assistant: Bol kar hisab likhein"
+      accessibilityLabel={t('voice.headerTitle')}
     >
       <View style={styles.micCircle}>
         <Ionicons name="mic" size={24} color={Palette.white} />
@@ -35,13 +37,13 @@ export const VoiceFab: React.FC<VoiceFabProps> = ({ compact = false }) => {
 
       <View style={styles.textContainer}>
         <View style={styles.headlineRow}>
-          <Text style={styles.headline}>Bol Kar Khata Likhein</Text>
+          <Text style={styles.headline}>{t('home.voiceBannerTitle')}</Text>
           <View style={styles.aiPill}>
-            <Text style={styles.aiPillText}>AI ASSISTANT</Text>
+            <Text style={styles.aiPillText}>{t('home.voiceAssistantBadge')}</Text>
           </View>
         </View>
         <Text style={styles.exampleText} numberOfLines={1}>
-          "Ramesh ko ₹300 ka udhaar likh do"
+          {t('home.voiceBannerExample')}
         </Text>
       </View>
 

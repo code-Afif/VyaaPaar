@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '@/constants/Colors';
 import { PaymentEvent } from '@/types';
 import { formatPaise } from '@/utils/format';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface PaymentEventCardProps {
   event: PaymentEvent;
@@ -16,6 +17,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
   onConfirmMatch,
   onViewDetails,
 }) => {
+  const { t } = useLanguage();
   const isReconciled = event.status === 'RECONCILED';
   const hasSuggestion = Boolean(event.suggestedCustomerId);
 
@@ -57,7 +59,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
                 },
               ]}
             >
-              {isReconciled ? 'RECONCILED' : 'UNMATCHED'}
+              {isReconciled ? t('card.reconciled') : t('card.unmatched')}
             </Text>
           </View>
         </View>
@@ -67,7 +69,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
       <View style={styles.metaRow}>
         <Text style={styles.timeText}>{event.timestamp}</Text>
         <View style={styles.mockBadge}>
-          <Text style={styles.mockBadgeText}>SIMULATED EVENT</Text>
+          <Text style={styles.mockBadgeText}>{t('card.simulatedEvent')}</Text>
         </View>
       </View>
 
@@ -81,7 +83,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
               color={Palette.primaryBlueDark}
             />
             <Text style={styles.suggestionTitle}>
-              Suggested Match: {event.suggestedCustomerName}
+              {t('card.suggestedMatch', { name: event.suggestedCustomerName || '' })}
             </Text>
           </View>
           <Text style={styles.suggestionReason}>{event.matchReason}</Text>
@@ -99,7 +101,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
                   size={16}
                   color={Palette.white}
                 />
-                <Text style={styles.confirmBtnText}>Confirm Match & Settle</Text>
+                <Text style={styles.confirmBtnText}>{t('card.confirmMatchAndSettle')}</Text>
               </Pressable>
             )}
 
@@ -108,7 +110,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
                 style={styles.detailsBtn}
                 onPress={() => onViewDetails(event.id)}
               >
-                <Text style={styles.detailsBtnText}>Details</Text>
+                <Text style={styles.detailsBtnText}>{t('common.details')}</Text>
               </Pressable>
             )}
           </View>
@@ -124,7 +126,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
             color={Palette.successGreen}
           />
           <Text style={styles.reconciledText}>
-            Reconciled to {event.suggestedCustomerName || 'Customer'} Khata
+            {t('card.reconciledToKhata', { name: event.suggestedCustomerName || 'Customer' })}
           </Text>
         </View>
       )}
@@ -139,7 +141,7 @@ export const PaymentEventCard: React.FC<PaymentEventCardProps> = ({
               onPress={() => onViewDetails(event.id)}
             >
               <Text style={styles.manualMatchBtnText}>
-                Manually Select Customer Khata
+                {t('card.manualMatch')}
               </Text>
             </Pressable>
           )}
@@ -175,55 +177,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   qrIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: Palette.primaryBlueLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   payerName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: Palette.darkNavy,
   },
   refText: {
     fontSize: 11,
-    color: Palette.textMuted,
-    marginTop: 1,
+    color: Palette.textSecondary,
+    marginTop: 2,
   },
   amountCol: {
     alignItems: 'flex-end',
   },
   amount: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: Palette.successGreen,
-    letterSpacing: -0.3,
   },
   statusPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
   },
   statusText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: Palette.borderLight,
   },
   timeText: {
-    fontSize: 11,
-    color: Palette.textSecondary,
+    fontSize: 12,
+    color: Palette.textMuted,
   },
   mockBadge: {
     backgroundColor: '#F1F5F9',
@@ -234,47 +235,46 @@ const styles = StyleSheet.create({
   mockBadgeText: {
     fontSize: 9,
     fontWeight: '600',
-    color: Palette.textSecondary,
+    color: Palette.textMuted,
+    letterSpacing: 0.5,
   },
   suggestionBox: {
     backgroundColor: '#F0F9FF',
     borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
     borderWidth: 1,
     borderColor: '#BAE6FD',
+    padding: 10,
+    marginTop: 10,
   },
   suggestionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 4,
+    gap: 6,
   },
   suggestionTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: Palette.primaryBlueDark,
   },
   suggestionReason: {
-    fontSize: 11,
+    fontSize: 12,
     color: Palette.textSecondary,
-    marginBottom: 8,
-    lineHeight: 16,
+    marginTop: 4,
   },
   actionRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+    marginTop: 10,
   },
   confirmBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Palette.primaryBlue,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    flex: 1,
-    justifyContent: 'center',
+    gap: 6,
   },
   confirmBtnText: {
     color: Palette.white,
@@ -288,53 +288,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   detailsBtnText: {
+    color: Palette.textPrimary,
     fontSize: 12,
     fontWeight: '600',
-    color: Palette.darkNavy,
   },
   reconciledBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: Palette.successGreenLight,
-    padding: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderRadius: 6,
+    gap: 6,
     marginTop: 10,
   },
   reconciledText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: Palette.successGreen,
   },
   unmatchedBox: {
-    backgroundColor: '#FAF5FF',
+    backgroundColor: '#FFFBEB',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 6,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: '#FDE68A',
   },
   unmatchedReason: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-    marginBottom: 8,
+    fontSize: 12,
+    color: Palette.warningAmber,
   },
   manualMatchBtn: {
     backgroundColor: Palette.white,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: Palette.warningAmber,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
-    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   manualMatchBtnText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: Palette.darkNavy,
+    fontWeight: '700',
+    color: Palette.warningAmber,
   },
 });

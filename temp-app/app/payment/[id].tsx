@@ -12,11 +12,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { formatPaise } from '@/utils/format';
 
 export default function PaymentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useLanguage();
   const { paymentEvents, customers, reconcilePayment } = useApp();
 
   const payment = paymentEvents.find((p) => p.id === id);
@@ -29,9 +31,9 @@ export default function PaymentDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.notFoundContainer}>
-          <Text style={styles.notFoundText}>Payment Event Not Found</Text>
+          <Text style={styles.notFoundText}>{t('paymentDetail.notFound')}</Text>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>Go Back</Text>
+            <Text style={styles.backBtnText}>{t('paymentDetail.goBack')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -42,7 +44,7 @@ export default function PaymentDetailScreen() {
 
   const handleReconcile = () => {
     if (!selectedCustomerId) {
-      Alert.alert('Customer Required', 'Kripya reconciliation ke liye grahak chunein.');
+      Alert.alert(t('paymentDetail.customerRequiredTitle'), t('paymentDetail.customerRequiredMsg'));
       return;
     }
 
@@ -52,15 +54,15 @@ export default function PaymentDetailScreen() {
     reconcilePayment(payment.id, selectedCustomerId);
 
     Alert.alert(
-      'Payment Reconciled Successfully! 🎉',
-      `${formatPaise(payment.amountPaise)} ka payment ${customer.name} ke Khata mein jama ho gaya hai.`,
+      t('paymentDetail.reconcileSuccessTitle'),
+      t('paymentDetail.reconcileSuccessMsg', { amount: formatPaise(payment.amountPaise), name: customer.name }),
       [
         {
-          text: 'Khata Dekhein',
+          text: t('paymentDetail.viewKhataBtn'),
           onPress: () => router.replace(`/customer/${customer.id}`),
         },
         {
-          text: 'Done',
+          text: t('paymentDetail.doneBtn'),
           onPress: () => router.back(),
         },
       ]
@@ -74,7 +76,7 @@ export default function PaymentDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <Ionicons name="close" size={24} color={Palette.darkNavy} />
         </Pressable>
-        <Text style={styles.headerTitle}>Payment Reconciliation</Text>
+        <Text style={styles.headerTitle}>{t('paymentDetail.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -87,10 +89,10 @@ export default function PaymentDetailScreen() {
           <View style={styles.badgeRow}>
             <View style={styles.channelBadge}>
               <Ionicons name="qr-code" size={14} color={Palette.primaryBlueDark} />
-              <Text style={styles.channelBadgeText}>PAYTM QR SOUNDBOX</Text>
+              <Text style={styles.channelBadgeText}>{t('paymentDetail.channelSoundbox')}</Text>
             </View>
             <View style={styles.simulatedBadge}>
-              <Text style={styles.simulatedBadgeText}>SIMULATED EVENT</Text>
+              <Text style={styles.simulatedBadgeText}>{t('paymentDetail.simulatedBadge')}</Text>
             </View>
           </View>
 
@@ -98,28 +100,28 @@ export default function PaymentDetailScreen() {
             +{formatPaise(payment.amountPaise)}
           </Text>
           <Text style={styles.statusLabel}>
-            Status: {isReconciled ? 'Reconciled to Ledger' : 'Unmatched / Pending Confirmation'}
+            {isReconciled ? t('paymentDetail.statusReconciled') : t('paymentDetail.statusUnmatched')}
           </Text>
 
           <View style={styles.divider} />
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>UTR / Reference:</Text>
+            <Text style={styles.metaLabel}>{t('paymentDetail.utrLabel')}</Text>
             <Text style={styles.metaValue}>{payment.referenceNo}</Text>
           </View>
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Payer Name:</Text>
+            <Text style={styles.metaLabel}>{t('paymentDetail.payerNameLabel')}</Text>
             <Text style={styles.metaValue}>{payment.payerName || 'N/A'}</Text>
           </View>
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>UPI ID:</Text>
+            <Text style={styles.metaLabel}>{t('paymentDetail.upiLabel')}</Text>
             <Text style={styles.metaValue}>{payment.upiId || 'N/A'}</Text>
           </View>
 
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Received Time:</Text>
+            <Text style={styles.metaLabel}>{t('paymentDetail.timeLabel')}</Text>
             <Text style={styles.metaValue}>{payment.timestamp}</Text>
           </View>
         </View>
@@ -129,7 +131,7 @@ export default function PaymentDetailScreen() {
           <View style={styles.reasonCard}>
             <View style={styles.reasonHeader}>
               <Ionicons name="sparkles" size={16} color={Palette.primaryBlueDark} />
-              <Text style={styles.reasonTitle}>AI Reconciliation Match Reasoning</Text>
+              <Text style={styles.reasonTitle}>{t('paymentDetail.aiReasoningTitle')}</Text>
             </View>
             <Text style={styles.reasonText}>{payment.matchReason}</Text>
           </View>
@@ -139,7 +141,7 @@ export default function PaymentDetailScreen() {
         {!isReconciled ? (
           <View style={styles.selectionCard}>
             <Text style={styles.sectionTitle}>
-              Select Customer Khata to Apply Repayment:
+              {t('paymentDetail.selectKhataHeading')}
             </Text>
 
             {customers.map((c) => {
@@ -165,13 +167,13 @@ export default function PaymentDetailScreen() {
                       {isSuggested && (
                         <View style={styles.suggestedPill}>
                           <Text style={styles.suggestedPillText}>
-                            BEST MATCH
+                            {t('paymentDetail.bestMatch')}
                           </Text>
                         </View>
                       )}
                     </View>
                     <Text style={styles.custDue}>
-                      Udhaar Due: {formatPaise(c.currentBalancePaise)}
+                      {t('paymentDetail.dueLabel', { amount: formatPaise(c.currentBalancePaise) })}
                     </Text>
                   </View>
                 </Pressable>
@@ -181,7 +183,7 @@ export default function PaymentDetailScreen() {
             <Pressable style={styles.confirmButton} onPress={handleReconcile}>
               <Ionicons name="checkmark-done" size={20} color={Palette.white} />
               <Text style={styles.confirmButtonText}>
-                Confirm Reconciliation & Settle Ledger
+                {t('paymentDetail.confirmSettleBtn')}
               </Text>
             </Pressable>
           </View>
@@ -193,7 +195,7 @@ export default function PaymentDetailScreen() {
               color={Palette.successGreen}
             />
             <Text style={styles.alreadySettledText}>
-              Yeh payment ledger mein safalta-purvak reconcile ho chuka hai.
+              {t('paymentDetail.alreadySettledText')}
             </Text>
           </View>
         )}

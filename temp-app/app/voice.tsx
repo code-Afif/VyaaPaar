@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { SEED_VOICE_COMMANDS } from '@/data/seedData';
 import { formatPaise, rupeesToPaise } from '@/utils/format';
 
@@ -27,6 +28,7 @@ interface ExtractedAction {
 
 export default function VoiceAssistantScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { customers, recordCreditSale, recordRepayment, briefing } = useApp();
 
   const [transcript, setTranscript] = useState(
@@ -35,7 +37,7 @@ export default function VoiceAssistantScreen() {
   const [isListening, setIsListening] = useState(false);
   const [proposedAction, setProposedAction] = useState<ExtractedAction | null>({
     intent: 'CREDIT_SALE',
-    intentLabel: 'Naya Udhaar Likhein (Record Credit Sale)',
+    intentLabel: t('voice.intentCreditLabel'),
     customerName: 'Ramesh Kumar',
     customerId: 'cust-1',
     amountRupees: 300,
@@ -69,7 +71,7 @@ export default function VoiceAssistantScreen() {
 
       setProposedAction({
         intent: 'CREDIT_SALE',
-        intentLabel: 'Naya Udhaar Likhein (Credit Sale)',
+        intentLabel: t('voice.intentCreditLabel'),
         customerName: cust.name,
         customerId: cust.id,
         amountRupees: amount,
@@ -89,7 +91,7 @@ export default function VoiceAssistantScreen() {
 
       setProposedAction({
         intent: 'REPAYMENT',
-        intentLabel: 'Paisa Mila (Repayment Entry)',
+        intentLabel: t('voice.intentRepayLabel'),
         customerName: cust.name,
         customerId: cust.id,
         amountRupees: amount,
@@ -106,10 +108,13 @@ export default function VoiceAssistantScreen() {
 
       setProposedAction({
         intent: 'SEARCH_BALANCE',
-        intentLabel: 'Grahak Udhaar Jaankari (Balance Check)',
+        intentLabel: t('voice.intentBalanceLabel'),
         customerName: cust.name,
         customerId: cust.id,
-        description: `${cust.name} ka kul udhaar ${formatPaise(cust.currentBalancePaise)} baaki hai.`,
+        description: t('voice.balanceDesc', {
+          name: cust.name,
+          amount: formatPaise(cust.currentBalancePaise),
+        }),
       });
       return;
     }
@@ -117,8 +122,11 @@ export default function VoiceAssistantScreen() {
     // Default daily summary
     setProposedAction({
       intent: 'DAILY_SUMMARY',
-      intentLabel: 'Aaj Ki Bikri Jaankari (Daily Summary)',
-      description: `Aaj ki total sale ${formatPaise(briefing.totalSalesPaise)} hai aur collected payments ${formatPaise(briefing.totalCollectedPaise)} hain.`,
+      intentLabel: t('voice.intentSummaryLabel'),
+      description: t('voice.summaryDesc', {
+        sales: formatPaise(briefing.totalSalesPaise),
+        collected: formatPaise(briefing.totalCollectedPaise),
+      }),
     });
   };
 
@@ -140,11 +148,14 @@ export default function VoiceAssistantScreen() {
       );
 
       Alert.alert(
-        'Transaction Recorded! ✅',
-        `${proposedAction.customerName} ke Khata mein ₹${proposedAction.amountRupees} ka udhaar safalta-purvak jud gaya hai.`,
+        t('voice.alertSuccessTitle'),
+        t('voice.alertSuccessMsg', {
+          name: proposedAction.customerName || '',
+          amount: proposedAction.amountRupees,
+        }),
         [
           {
-            text: 'Khata Dekhein',
+            text: t('voice.viewKhataBtn'),
             onPress: () => router.replace(`/customer/${proposedAction.customerId}`),
           },
         ]
@@ -162,11 +173,14 @@ export default function VoiceAssistantScreen() {
       );
 
       Alert.alert(
-        'Repayment Recorded! ✅',
-        `${proposedAction.customerName} se prapt ₹${proposedAction.amountRupees} khata mein jama ho gaye hain.`,
+        t('voice.alertRepayTitle'),
+        t('voice.alertRepayMsg', {
+          name: proposedAction.customerName || '',
+          amount: proposedAction.amountRupees,
+        }),
         [
           {
-            text: 'Khata Dekhein',
+            text: t('voice.viewKhataBtn'),
             onPress: () => router.replace(`/customer/${proposedAction.customerId}`),
           },
         ]
@@ -188,7 +202,7 @@ export default function VoiceAssistantScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
           <Ionicons name="close" size={24} color={Palette.darkNavy} />
         </Pressable>
-        <Text style={styles.headerTitle}>AI Voice Assistant</Text>
+        <Text style={styles.headerTitle}>{t('voice.headerTitle')}</Text>
         <View style={styles.demoBadge}>
           <Text style={styles.demoBadgeText}>VOICE-TO-KHATA</Text>
         </View>
@@ -217,12 +231,12 @@ export default function VoiceAssistantScreen() {
 
           <Text style={styles.micStatusText}>
             {isListening
-              ? 'Sun rahe hain... (Listening)'
-              : 'Dabayein aur bolein ya niche sample chunein'}
+              ? t('voice.micListening')
+              : t('voice.micTapHint')}
           </Text>
 
           <Text style={styles.languageText}>
-            Supported: Hindi / Hinglish / English
+            {t('voice.supportedLangs')}
           </Text>
         </View>
 
@@ -230,9 +244,9 @@ export default function VoiceAssistantScreen() {
         <View style={styles.transcriptCard}>
           <View style={styles.transcriptHeaderRow}>
             <Text style={styles.transcriptLabel}>
-              Recognized Speech (Aapka Sandesh):
+              {t('voice.transcriptTitle')}
             </Text>
-            <Text style={styles.editableHint}>Editable text</Text>
+            <Text style={styles.editableHint}>{t('voice.editableHint')}</Text>
           </View>
 
           <TextInput
@@ -243,7 +257,7 @@ export default function VoiceAssistantScreen() {
               setTranscript(txt);
               analyzeTranscript(txt);
             }}
-            placeholder="Kuchh bolein ya yahan type karein..."
+            placeholder={t('voice.transcriptPlaceholder')}
             placeholderTextColor={Palette.textMuted}
           />
         </View>
@@ -254,9 +268,9 @@ export default function VoiceAssistantScreen() {
             <View style={styles.proposalHeader}>
               <View style={styles.aiBadge}>
                 <Ionicons name="sparkles" size={14} color={Palette.white} />
-                <Text style={styles.aiBadgeText}>AI ACTION PROPOSAL</Text>
+                <Text style={styles.aiBadgeText}>{t('voice.aiProposal')}</Text>
               </View>
-              <Text style={styles.requiresConfirm}>Needs Confirmation</Text>
+              <Text style={styles.requiresConfirm}>{t('voice.needsConfirm')}</Text>
             </View>
 
             <View style={styles.intentRow}>
@@ -265,7 +279,7 @@ export default function VoiceAssistantScreen() {
 
             {proposedAction.customerName && (
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Grahak (Customer):</Text>
+                <Text style={styles.detailLabel}>{t('voice.customerLabel')}</Text>
                 <Text style={styles.detailValue}>
                   {proposedAction.customerName}
                 </Text>
@@ -274,7 +288,7 @@ export default function VoiceAssistantScreen() {
 
             {proposedAction.amountRupees !== undefined && (
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Raqam (Amount):</Text>
+                <Text style={styles.detailLabel}>{t('voice.amountLabel')}</Text>
                 <Text
                   style={[
                     styles.detailValue,
@@ -295,7 +309,7 @@ export default function VoiceAssistantScreen() {
 
             {proposedAction.description && (
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Vivaran (Note):</Text>
+                <Text style={styles.detailLabel}>{t('voice.descLabel')}</Text>
                 <Text style={styles.detailValue}>
                   {proposedAction.description}
                 </Text>
@@ -307,7 +321,7 @@ export default function VoiceAssistantScreen() {
                 style={styles.cancelBtn}
                 onPress={() => setProposedAction(null)}
               >
-                <Text style={styles.cancelBtnText}>Radd Karein</Text>
+                <Text style={styles.cancelBtnText}>{t('voice.cancelBtn')}</Text>
               </Pressable>
 
               <Pressable
@@ -319,7 +333,7 @@ export default function VoiceAssistantScreen() {
                   size={18}
                   color={Palette.white}
                 />
-                <Text style={styles.confirmBtnText}>Haan, Khata Mein Likho</Text>
+                <Text style={styles.confirmBtnText}>{t('voice.confirmEntryBtn')}</Text>
               </Pressable>
             </View>
           </View>
@@ -327,7 +341,7 @@ export default function VoiceAssistantScreen() {
 
         {/* Quick Sample Voice Commands */}
         <Text style={styles.samplesTitle}>
-          Try Common Kirana Voice Commands (Click to Test):
+          {t('voice.trySamples')}
         </Text>
 
         <View style={styles.samplesList}>

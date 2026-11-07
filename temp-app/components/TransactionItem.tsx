@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Palette } from '@/constants/Colors';
 import { LedgerEntry } from '@/types';
 import { formatPaise } from '@/utils/format';
+import { useLanguage } from '@/context/LanguageContext';
 
 interface TransactionItemProps {
   entry: LedgerEntry;
@@ -16,6 +17,7 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
   onPress,
   showCustomerName = true,
 }) => {
+  const { t } = useLanguage();
   const isCreditSale = entry.type === 'CREDIT_SALE';
 
   const getSourceIcon = () => {
@@ -26,6 +28,17 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
         return 'qr-code';
       default:
         return 'create-outline';
+    }
+  };
+
+  const getSourceText = () => {
+    switch (entry.source) {
+      case 'VOICE':
+        return t('card.voiceSource');
+      case 'RECONCILED':
+        return t('card.qrSource');
+      default:
+        return t('card.manualSource');
     }
   };
 
@@ -73,13 +86,7 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
                 size={11}
                 color={Palette.textSecondary}
               />
-              <Text style={styles.sourceText}>
-                {entry.source === 'VOICE'
-                  ? 'Voice'
-                  : entry.source === 'RECONCILED'
-                  ? 'UPI QR'
-                  : 'Manual'}
-              </Text>
+              <Text style={styles.sourceText}>{getSourceText()}</Text>
             </View>
           </View>
         </View>
@@ -105,7 +112,7 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({
             },
           ]}
         >
-          {isCreditSale ? 'Udhaar Diya' : 'Paisa Mila'}
+          {isCreditSale ? t('card.creditSaleType') : t('card.repaymentType')}
         </Text>
       </View>
     </Pressable>
@@ -130,12 +137,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
   avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -147,17 +154,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: Palette.darkNavy,
-    marginBottom: 2,
   },
   description: {
     fontSize: 12,
     color: Palette.textSecondary,
-    marginBottom: 4,
+    marginTop: 1,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 4,
   },
   timeText: {
     fontSize: 11,
@@ -166,27 +173,27 @@ const styles = StyleSheet.create({
   sourceTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    backgroundColor: Palette.borderLight,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    backgroundColor: Palette.background,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
+    gap: 3,
   },
   sourceText: {
     fontSize: 10,
-    fontWeight: '500',
     color: Palette.textSecondary,
+    fontWeight: '600',
   },
   rightCol: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   amount: {
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: -0.3,
   },
   typeLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
   },

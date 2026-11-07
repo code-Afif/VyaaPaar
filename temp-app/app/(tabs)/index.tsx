@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { Header } from '@/components/Header';
 import { MetricCard } from '@/components/MetricCard';
 import { VoiceFab } from '@/components/VoiceFab';
@@ -29,6 +30,7 @@ export default function HomeScreen() {
     recordCreditSale,
     recordRepayment,
   } = useApp();
+  const { t } = useLanguage();
 
   // Quick Action Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -43,19 +45,19 @@ export default function HomeScreen() {
     setActionType(type);
     setSelectedCustomerId(customers[0]?.id || '');
     setAmountRupees('');
-    setDescription(type === 'CREDIT_SALE' ? 'Kirana samaan' : 'Counter cash payment');
+    setDescription(type === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder'));
     setModalVisible(true);
   };
 
   const handleSubmitQuickAction = () => {
     const rupees = parseFloat(amountRupees);
     if (isNaN(rupees) || rupees <= 0) {
-      Alert.alert('Amount Required', 'Kripya sahi raqam (₹) enter karein.');
+      Alert.alert(t('home.amountRequiredTitle'), t('home.amountRequiredMsg'));
       return;
     }
 
     if (!selectedCustomerId) {
-      Alert.alert('Customer Required', 'Kripya customer select karein.');
+      Alert.alert(t('home.customerRequiredTitle'), t('home.customerRequiredMsg'));
       return;
     }
 
@@ -82,8 +84,8 @@ export default function HomeScreen() {
         {/* Metric Cards Row */}
         <View style={styles.metricsRow}>
           <MetricCard
-            title="Aaj Ki Bikri"
-            subtitle="Today's Sales"
+            title={t('home.todaySales')}
+            subtitle={t('home.todaySalesSub')}
             amountPaise={briefing.totalSalesPaise}
             iconName="cart"
             variant="navy"
@@ -92,16 +94,16 @@ export default function HomeScreen() {
 
         <View style={styles.metricsTwoCol}>
           <MetricCard
-            title="Paisa Mila"
-            subtitle="Collected"
+            title={t('home.collected')}
+            subtitle={t('home.collectedSub')}
             amountPaise={briefing.totalCollectedPaise}
             iconName="arrow-down-circle"
             variant="success"
             onPress={() => router.push('/(tabs)/payments')}
           />
           <MetricCard
-            title="Total Udhaar"
-            subtitle="Outstanding Due"
+            title={t('home.outstandingDue')}
+            subtitle={t('home.outstandingDueSub')}
             amountPaise={briefing.totalOutstandingPaise}
             iconName="book"
             variant="danger"
@@ -117,26 +119,28 @@ export default function HomeScreen() {
           <Pressable
             style={[styles.quickActionButton, styles.creditSaleButton]}
             onPress={() => handleOpenQuickAction('CREDIT_SALE')}
+            accessibilityLabel={t('home.quickCreditTitle')}
           >
             <View style={styles.quickActionIconRed}>
               <Ionicons name="arrow-up" size={18} color={Palette.dangerRed} />
             </View>
             <View style={styles.quickActionTextCol}>
-              <Text style={styles.quickActionTitleRed}>+ Naya Udhaar</Text>
-              <Text style={styles.quickActionSub}>Record Credit Sale</Text>
+              <Text style={styles.quickActionTitleRed}>{t('home.quickCreditTitle')}</Text>
+              <Text style={styles.quickActionSub}>{t('home.quickCreditSub')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             style={[styles.quickActionButton, styles.repaymentButton]}
             onPress={() => handleOpenQuickAction('REPAYMENT')}
+            accessibilityLabel={t('home.quickRepayTitle')}
           >
             <View style={styles.quickActionIconGreen}>
               <Ionicons name="arrow-down" size={18} color={Palette.successGreen} />
             </View>
             <View style={styles.quickActionTextCol}>
-              <Text style={styles.quickActionTitleGreen}>+ Paisa Mila</Text>
-              <Text style={styles.quickActionSub}>Record Repayment</Text>
+              <Text style={styles.quickActionTitleGreen}>{t('home.quickRepayTitle')}</Text>
+              <Text style={styles.quickActionSub}>{t('home.quickRepaySub')}</Text>
             </View>
           </Pressable>
         </View>
@@ -146,14 +150,14 @@ export default function HomeScreen() {
           <View style={styles.recHeaderRow}>
             <View style={styles.recBadge}>
               <Ionicons name="sparkles" size={14} color={Palette.primaryBlueDark} />
-              <Text style={styles.recBadgeText}>AI BUSINESS BRIEFING</Text>
+              <Text style={styles.recBadgeText}>{t('home.aiBriefingBadge')}</Text>
             </View>
             <Text style={styles.recDate}>Grounding: Verified</Text>
           </View>
 
-          <Text style={styles.recTitle}>{briefing.topRecommendation.title}</Text>
+          <Text style={styles.recTitle}>{t('home.aiRecTitle')}</Text>
           <Text style={styles.recDescription}>
-            {briefing.topRecommendation.description}
+            {t('home.aiRecBody')}
           </Text>
 
           <Pressable
@@ -161,16 +165,16 @@ export default function HomeScreen() {
             onPress={() => router.push('/(tabs)/insights')}
           >
             <Text style={styles.recActionText}>
-              {briefing.topRecommendation.actionText} →
+              {t('home.aiRecAction')} →
             </Text>
           </Pressable>
         </View>
 
         {/* Recent Transactions Section */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Text style={styles.sectionTitle}>{t('home.recentTxTitle')}</Text>
           <Pressable onPress={() => router.push('/(tabs)/khata')}>
-            <Text style={styles.viewAllText}>View All Khata →</Text>
+            <Text style={styles.viewAllText}>{t('home.viewAll')} →</Text>
           </Pressable>
         </View>
 
@@ -188,7 +192,7 @@ export default function HomeScreen() {
         <View style={styles.footerNote}>
           <Ionicons name="shield-checkmark" size={14} color={Palette.textMuted} />
           <Text style={styles.footerNoteText}>
-            DukaanSaathi • Fictional Demo Mode • Exact Paise Ledger
+            DukaanSaathi • Exact Paise Ledger
           </Text>
         </View>
       </ScrollView>
@@ -204,7 +208,9 @@ export default function HomeScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {actionType === 'CREDIT_SALE' ? 'Naya Udhaar Likhein' : 'Paisa Mila (Repayment)'}
+                {actionType === 'CREDIT_SALE'
+                  ? t('home.quickModalCreditTitle')
+                  : t('home.quickModalRepayTitle')}
               </Text>
               <Pressable onPress={() => setModalVisible(false)} hitSlop={10}>
                 <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
@@ -212,7 +218,7 @@ export default function HomeScreen() {
             </View>
 
             {/* Select Customer */}
-            <Text style={styles.inputLabel}>Grahak Chunein (Select Customer)</Text>
+            <Text style={styles.inputLabel}>{t('home.selectCustomer')}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -244,7 +250,7 @@ export default function HomeScreen() {
                           isSelected && styles.chipDueSelected,
                         ]}
                       >
-                        (Due: {formatPaise(c.currentBalancePaise)})
+                        ({t('card.due')}: {formatPaise(c.currentBalancePaise)})
                       </Text>
                     )}
                   </Pressable>
@@ -253,13 +259,13 @@ export default function HomeScreen() {
             </ScrollView>
 
             {/* Amount input */}
-            <Text style={styles.inputLabel}>Raqam / Amount (₹)</Text>
+            <Text style={styles.inputLabel}>{t('home.amountRupees')}</Text>
             <View style={styles.amountInputWrapper}>
               <Text style={styles.currencySymbol}>₹</Text>
               <TextInput
                 style={styles.amountInput}
                 keyboardType="numeric"
-                placeholder="500"
+                placeholder={t('home.amountPlaceholder')}
                 placeholderTextColor={Palette.textMuted}
                 value={amountRupees}
                 onChangeText={setAmountRupees}
@@ -268,10 +274,14 @@ export default function HomeScreen() {
             </View>
 
             {/* Description input */}
-            <Text style={styles.inputLabel}>Vivaran (Description / Samaan)</Text>
+            <Text style={styles.inputLabel}>{t('home.description')}</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="e.g. Atta 5kg, Dal, Tel"
+              placeholder={
+                actionType === 'CREDIT_SALE'
+                  ? t('home.descriptionCreditPlaceholder')
+                  : t('home.descriptionRepayPlaceholder')
+              }
               placeholderTextColor={Palette.textMuted}
               value={description}
               onChangeText={setDescription}
@@ -291,9 +301,7 @@ export default function HomeScreen() {
               onPress={handleSubmitQuickAction}
             >
               <Text style={styles.modalSubmitText}>
-                {actionType === 'CREDIT_SALE'
-                  ? 'Confirm Udhaar Entry'
-                  : 'Confirm Repayment'}
+                {t('home.saveTransaction')}
               </Text>
             </Pressable>
           </View>

@@ -14,12 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Palette } from '@/constants/Colors';
 import { useApp } from '@/context/AppContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { rupeesToPaise } from '@/utils/format';
 import { generateUUID } from '@/utils/uuid';
 
 export default function NewCustomerScreen() {
   const router = useRouter();
   const { addCustomer } = useApp();
+  const { t } = useLanguage();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -34,7 +36,7 @@ export default function NewCustomerScreen() {
     }
 
     if (!name.trim()) {
-      Alert.alert('Name Required', 'Kripya grahak ka naam enter karein.');
+      Alert.alert(t('customerNew.nameValidationTitle'), t('customerNew.nameValidationMsg'));
       return;
     }
 
@@ -51,17 +53,17 @@ export default function NewCustomerScreen() {
       const newCust = await addCustomer(name, cleanPhone, openingPaise, operationCustomerId);
 
       Alert.alert(
-        'Grahak Joda Gaya 🎉',
-        `${newCust.name} ka khata safalta-purvak ban gaya hai.`,
+        t('customerNew.successTitle'),
+        t('customerNew.successMsg', { name: newCust.name }),
         [
           {
-            text: 'Khata Kholein',
+            text: t('customerNew.openKhataBtn'),
             onPress: () => router.replace(`/customer/${newCust.id}`),
           },
         ]
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Grahak jodne mein samasya aayi. Kripya punah prayas karein.');
+      Alert.alert(t('customerNew.errorTitle'), err?.message || t('customerNew.errorMsg'));
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -72,10 +74,10 @@ export default function NewCustomerScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
+        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10} accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={Palette.darkNavy} />
         </Pressable>
-        <Text style={styles.headerTitle}>Naya Grahak Jodein</Text>
+        <Text style={styles.headerTitle}>{t('customerNew.headerTitle')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -86,13 +88,13 @@ export default function NewCustomerScreen() {
         <View style={styles.formCard}>
           {/* Customer Name */}
           <Text style={styles.label}>
-            Grahak Ka Naam <Text style={styles.required}>*</Text>
+            {t('customerNew.nameLabel')} <Text style={styles.required}>*</Text>
           </Text>
           <View style={styles.inputWrapper}>
             <Ionicons name="person-outline" size={18} color={Palette.textSecondary} />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Mukesh Aggarwal"
+              placeholder={t('customerNew.namePlaceholder')}
               placeholderTextColor={Palette.textMuted}
               value={name}
               onChangeText={setName}
@@ -101,12 +103,12 @@ export default function NewCustomerScreen() {
           </View>
 
           {/* Mobile Number */}
-          <Text style={styles.label}>Mobile Number (WhatsApp Reminder ke liye)</Text>
+          <Text style={styles.label}>{t('customerNew.phoneLabel')}</Text>
           <View style={styles.inputWrapper}>
             <Ionicons name="call-outline" size={18} color={Palette.textSecondary} />
             <TextInput
               style={styles.input}
-              placeholder="9876543210"
+              placeholder={t('customerNew.phonePlaceholder')}
               placeholderTextColor={Palette.textMuted}
               keyboardType="phone-pad"
               maxLength={13}
@@ -117,13 +119,13 @@ export default function NewCustomerScreen() {
 
           {/* Opening Balance */}
           <Text style={styles.label}>
-            Pichhla Purana Udhaar (Opening Balance, optional)
+            {t('customerNew.openingBalanceLabel')}
           </Text>
           <View style={styles.inputWrapper}>
             <Text style={styles.rupeePrefix}>₹</Text>
             <TextInput
               style={styles.input}
-              placeholder="0 (Agar pehle se udhaar baaki ho)"
+              placeholder={t('customerNew.openingBalancePlaceholder')}
               placeholderTextColor={Palette.textMuted}
               keyboardType="numeric"
               value={openingBalance}
@@ -141,12 +143,12 @@ export default function NewCustomerScreen() {
           {isSubmitting ? (
             <>
               <ActivityIndicator size="small" color={Palette.white} />
-              <Text style={styles.saveButtonText}>Creating...</Text>
+              <Text style={styles.saveButtonText}>{t('customerNew.creatingBtn')}</Text>
             </>
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={20} color={Palette.white} />
-              <Text style={styles.saveButtonText}>Grahak Khata Banayein</Text>
+              <Text style={styles.saveButtonText}>{t('customerNew.createBtn')}</Text>
             </>
           )}
         </Pressable>
