@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,20 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { Header } from '@/components/Header';
-import { MetricCard } from '@/components/MetricCard';
-import { VoiceFab } from '@/components/VoiceFab';
-import { TransactionItem } from '@/components/TransactionItem';
+import { ScreenHeader, AmountText } from '@/components/ui';
 import { formatPaise, rupeesToPaise } from '@/utils/format';
 
 export default function HomeScreen() {
   const router = useRouter();
   const {
+    merchant,
     briefing,
     ledgerEntries,
     customers,
+    paymentEvents,
     recordCreditSale,
     recordRepayment,
   } = useApp();
@@ -39,13 +38,28 @@ export default function HomeScreen() {
   const [amountRupees, setAmountRupees] = useState('');
   const [description, setDescription] = useState('');
 
-  const recentTransactions = ledgerEntries.slice(0, 5);
+  const recentTransactions = useMemo(() => ledgerEntries.slice(0, 5), [ledgerEntries]);
+
+  // Derived real alerts (NO FAKE / INVENTED DATA)
+  const topOverdueCustomer = useMemo(() => {
+    return customers
+      .filter((c) => (c.currentBalancePaise || 0) > 0)
+      .sort((a, b) => (b.currentBalancePaise || 0) - (a.currentBalancePaise || 0))[0];
+  }, [customers]);
+
+  const unmatchedPayment = useMemo(() => {
+    return paymentEvents.find((p) => p.status === 'UNMATCHED');
+  }, [paymentEvents]);
 
   const handleOpenQuickAction = (type: 'CREDIT_SALE' | 'REPAYMENT') => {
     setActionType(type);
     setSelectedCustomerId(customers[0]?.id || '');
     setAmountRupees('');
-    setDescription(type === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder'));
+    setDescription(
+      type === 'CREDIT_SALE'
+        ? t('home.descriptionCreditPlaceholder')
+        : t('home.descriptionRepayPlaceholder')
+    );
     setModalVisible(true);
   };
 
@@ -72,132 +86,206 @@ export default function HomeScreen() {
     setAmountRupees('');
   };
 
+  const storeTitle = merchant?.storeName?.trim() || 'Sharma General Store';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header />
+      {/* Docked 56dp TopAppBar matching Stitch */}
+      <ScreenHeader
+        title={storeTitle}
+        rightAction={
+          <Pressable
+            style={styles.headerIconButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Notifications"
+          >
+            <Ionicons name="notifications-outline" size={22} color={Theme.colors.onSurface} />
+            <View style={styles.notificationAlertDot} />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Metric Cards Row */}
-        <View style={styles.metricsRow}>
-          <MetricCard
-            title={t('home.todaySales')}
-            subtitle={t('home.todaySalesSub')}
-            amountPaise={briefing.totalSalesPaise}
-            iconName="cart"
-            variant="navy"
+        {/* Monolithic Deep Navy Masthead Panel */}
+        <View style={styles.heroPanel}>
+          <Text style={styles.heroSubLabel}>{t('stitch.totalUdhaarOwed')}</Text>
+          <AmountText
+            amountPaise={briefing.totalOutstandingPaise || 0}
+            variant="white"
+            size="hero"
+            style={styles.heroAmount}
           />
+
+          <View style={styles.heroDualRow}>
+            {/* Left: Total Grahak */}
+            <View style={styles.heroColLeft}>
+              <Text style={styles.heroColLabel}>{t('stitch.totalGrahak')}</Text>
+              <Text style={styles.heroColValue}>
+                {t('stitch.grahakCountUnit', { count: customers.length })}
+              </Text>
+            </View>
+
+            {/* Right: Aaj ka Payment */}
+            <View style={styles.heroColRight}>
+              <Text style={styles.heroColLabel}>{t('stitch.aajKaPayment')}</Text>
+              <Text style={styles.heroColValueGreen}>
+                + {formatPaise(briefing.totalCollectedPaise || 0)}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.metricsTwoCol}>
-          <MetricCard
-            title={t('home.collected')}
-            subtitle={t('home.collectedSub')}
-            amountPaise={briefing.totalCollectedPaise}
-            iconName="arrow-down-circle"
-            variant="success"
-            onPress={() => router.push('/(tabs)/payments')}
-          />
-          <MetricCard
-            title={t('home.outstandingDue')}
-            subtitle={t('home.outstandingDueSub')}
-            amountPaise={briefing.totalOutstandingPaise}
-            iconName="book"
-            variant="danger"
-            onPress={() => router.push('/(tabs)/khata')}
-          />
-        </View>
-
-        {/* Voice Assistant Entry Banner */}
-        <VoiceFab />
-
-        {/* Quick Actions (Naya Udhaar / Paisa Mila) */}
-        <View style={styles.quickActionsContainer}>
+        {/* Quick Action Ruled Ledger Bar */}
+        <View style={styles.quickActionBar}>
           <Pressable
-            style={[styles.quickActionButton, styles.creditSaleButton]}
+            style={[styles.quickActionBtn, styles.quickActionBtnLeft]}
             onPress={() => handleOpenQuickAction('CREDIT_SALE')}
-            accessibilityLabel={t('home.quickCreditTitle')}
+            accessibilityLabel={t('stitch.udhaarDiyaBtn')}
           >
-            <View style={styles.quickActionIconRed}>
-              <Ionicons name="arrow-up" size={18} color={Palette.dangerRed} />
-            </View>
-            <View style={styles.quickActionTextCol}>
-              <Text style={styles.quickActionTitleRed}>{t('home.quickCreditTitle')}</Text>
-              <Text style={styles.quickActionSub}>{t('home.quickCreditSub')}</Text>
-            </View>
+            <Ionicons name="remove-circle-outline" size={20} color={Theme.colors.moneyRed} />
+            <Text style={styles.quickActionTextRed}>{t('stitch.udhaarDiyaBtn')}</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.quickActionButton, styles.repaymentButton]}
+            style={styles.quickActionBtn}
             onPress={() => handleOpenQuickAction('REPAYMENT')}
-            accessibilityLabel={t('home.quickRepayTitle')}
+            accessibilityLabel={t('stitch.jamaMilaBtn')}
           >
-            <View style={styles.quickActionIconGreen}>
-              <Ionicons name="arrow-down" size={18} color={Palette.successGreen} />
-            </View>
-            <View style={styles.quickActionTextCol}>
-              <Text style={styles.quickActionTitleGreen}>{t('home.quickRepayTitle')}</Text>
-              <Text style={styles.quickActionSub}>{t('home.quickRepaySub')}</Text>
-            </View>
+            <Ionicons name="add-circle-outline" size={20} color={Theme.colors.moneyGreen} />
+            <Text style={styles.quickActionTextGreen}>{t('stitch.jamaMilaBtn')}</Text>
           </Pressable>
         </View>
 
-        {/* AI Business Recommendation Card */}
-        <View style={styles.recommendationCard}>
-          <View style={styles.recHeaderRow}>
-            <View style={styles.recBadge}>
-              <Ionicons name="sparkles" size={14} color={Palette.primaryBlueDark} />
-              <Text style={styles.recBadgeText}>{t('home.aiBriefingBadge')}</Text>
-            </View>
-            <Text style={styles.recDate}>Grounding: Verified</Text>
+        {/* Section: Zaroori Alerts */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeaderLabel}>{t('stitch.zarooriAlerts')}</Text>
+
+          <View style={styles.ledgerGroup}>
+            {/* Alert Row 1: Overdue customer */}
+            {topOverdueCustomer ? (
+              <View style={styles.ledgerRow}>
+                <View style={styles.ledgerRowTextCol}>
+                  <Text style={styles.ledgerRowTitle}>{topOverdueCustomer.name}</Text>
+                  <Text style={styles.ledgerRowSubtitle}>
+                    {formatPaise(topOverdueCustomer.currentBalancePaise)} {t('stitch.owedSubtitle')}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.actionPillBtn}
+                  onPress={() => router.push(`/customer/${topOverdueCustomer.id}`)}
+                >
+                  <Text style={styles.actionPillText}>{t('stitch.tagaadaBhejein')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Alert Row 2: Unmatched payment or clean state */}
+            {unmatchedPayment ? (
+              <View style={styles.ledgerRow}>
+                <View style={styles.ledgerRowTextCol}>
+                  <Text style={styles.ledgerRowTitle}>{t('stitch.unmatchedAlertTitle')}</Text>
+                  <Text style={styles.ledgerRowSubtitle}>
+                    {formatPaise(unmatchedPayment.amountPaise)} {t('stitch.unmatchedAlertSub')}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.actionPillBtn}
+                  onPress={() => router.push('/(tabs)/payments')}
+                >
+                  <Text style={styles.actionPillText}>{t('stitch.linkKarein')}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {/* Alert Row 3: Aaj ka Hisaab */}
+            <Pressable
+              style={styles.ledgerRow}
+              onPress={() => router.push('/(tabs)/khata')}
+            >
+              <View style={styles.ledgerRowTextCol}>
+                <Text style={styles.ledgerRowTitle}>{t('stitch.aajKaHisaabTitle')}</Text>
+                <Text style={styles.ledgerRowSubtitle}>
+                  {t('stitch.aajKaHisaabSub', { count: ledgerEntries.length })}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Theme.colors.onSurfaceVariant} />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Section: Haal ke Lenden (Recent Transactions Roll) */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeaderLabel}>{t('stitch.haalKeLenden')}</Text>
+            <Pressable onPress={() => router.push('/(tabs)/khata')}>
+              <Text style={styles.viewAllText}>{t('stitch.sabhiDekhein')}</Text>
+            </Pressable>
           </View>
 
-          <Text style={styles.recTitle}>{t('home.aiRecTitle')}</Text>
-          <Text style={styles.recDescription}>
-            {t('home.aiRecBody')}
-          </Text>
+          <View style={styles.ledgerGroup}>
+            {recentTransactions.length === 0 ? (
+              <View style={styles.emptyRow}>
+                <Text style={styles.emptyRowText}>{t('customerDetail.emptyLedger')}</Text>
+              </View>
+            ) : (
+              recentTransactions.map((item) => {
+                const customer = customers.find((c) => c.id === item.customerId);
+                const isCredit = item.type === 'CREDIT_SALE';
+                const displayName = customer?.name || item.customerName || 'Grahak';
+                const note = item.description || (isCredit ? 'Udhaar' : 'Jama');
 
-          <Pressable
-            style={styles.recActionButton}
-            onPress={() => router.push('/(tabs)/insights')}
-          >
-            <Text style={styles.recActionText}>
-              {t('home.aiRecAction')} →
-            </Text>
-          </Pressable>
+                return (
+                  <Pressable
+                    key={item.id}
+                    style={styles.ledgerRow}
+                    onPress={() => router.push(`/customer/${item.customerId}`)}
+                  >
+                    <View style={styles.ledgerRowTextCol}>
+                      <Text style={styles.ledgerRowTitle}>{displayName}</Text>
+                      <Text style={styles.ledgerRowSubtitle}>{note}</Text>
+                    </View>
+                    <View style={styles.ledgerRowAmountCol}>
+                      <Text
+                        style={[
+                          styles.transactionAmount,
+                          isCredit ? styles.amountRed : styles.amountGreen,
+                        ]}
+                      >
+                        {isCredit ? '- ' : '+ '}
+                        {formatPaise(item.amountPaise)}
+                      </Text>
+                      <Text style={styles.transactionLabel}>
+                        {isCredit ? t('stitch.dueUdhaarLabel') : t('stitch.jamaLabel')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })
+            )}
+          </View>
         </View>
 
-        {/* Recent Transactions Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{t('home.recentTxTitle')}</Text>
-          <Pressable onPress={() => router.push('/(tabs)/khata')}>
-            <Text style={styles.viewAllText}>{t('home.viewAll')} →</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.transactionsCard}>
-          {recentTransactions.map((item) => (
-            <TransactionItem
-              key={item.id}
-              entry={item}
-              onPress={() => router.push(`/customer/${item.customerId}`)}
-            />
-          ))}
-        </View>
-
-        {/* Footer info note */}
+        {/* Footer Seal Notation */}
         <View style={styles.footerNote}>
-          <Ionicons name="shield-checkmark" size={14} color={Palette.textMuted} />
-          <Text style={styles.footerNoteText}>
-            DukaanSaathi • Exact Paise Ledger
-          </Text>
+          <Text style={styles.footerNoteText}>{t('stitch.pannaPurna')}</Text>
         </View>
       </ScrollView>
 
-      {/* Quick Action Modal */}
+      {/* Contextual Floating Voice Action Button (Stitch Mic FAB) */}
+      <Pressable
+        style={styles.voiceFab}
+        onPress={() => router.push('/voice')}
+        accessibilityLabel={t('stitch.boloKhata')}
+      >
+        <Ionicons name="mic" size={20} color={Theme.colors.onPrimary} />
+        <Text style={styles.voiceFabText}>{t('stitch.boloKhata')}</Text>
+      </Pressable>
+
+      {/* Quick Action Modal (Preserved with existing functional dispatch) */}
       <Modal
         visible={modalVisible}
         transparent
@@ -213,7 +301,7 @@ export default function HomeScreen() {
                   : t('home.quickModalRepayTitle')}
               </Text>
               <Pressable onPress={() => setModalVisible(false)} hitSlop={10}>
-                <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
+                <Ionicons name="close-circle" size={24} color={Theme.colors.onSurfaceVariant} />
               </Pressable>
             </View>
 
@@ -250,7 +338,7 @@ export default function HomeScreen() {
                           isSelected && styles.chipDueSelected,
                         ]}
                       >
-                        ({t('card.due')}: {formatPaise(c.currentBalancePaise)})
+                        ₹{(c.currentBalancePaise / 100).toFixed(0)}
                       </Text>
                     )}
                   </Pressable>
@@ -258,52 +346,55 @@ export default function HomeScreen() {
               })}
             </ScrollView>
 
-            {/* Amount input */}
-            <Text style={styles.inputLabel}>{t('home.amountRupees')}</Text>
-            <View style={styles.amountInputWrapper}>
-              <Text style={styles.currencySymbol}>₹</Text>
+            {/* Amount Input */}
+            <Text style={styles.inputLabel}>{t('home.amountLabel')}</Text>
+            <View style={styles.amountInputRow}>
+              <Text style={styles.rupeeSign}>₹</Text>
               <TextInput
                 style={styles.amountInput}
+                placeholder="0.00"
+                placeholderTextColor={Theme.colors.outline}
                 keyboardType="numeric"
-                placeholder={t('home.amountPlaceholder')}
-                placeholderTextColor={Palette.textMuted}
                 value={amountRupees}
                 onChangeText={setAmountRupees}
                 autoFocus
               />
             </View>
 
-            {/* Description input */}
-            <Text style={styles.inputLabel}>{t('home.description')}</Text>
+            {/* Description */}
+            <Text style={styles.inputLabel}>{t('home.descriptionLabel')}</Text>
             <TextInput
-              style={styles.textInput}
-              placeholder={
-                actionType === 'CREDIT_SALE'
-                  ? t('home.descriptionCreditPlaceholder')
-                  : t('home.descriptionRepayPlaceholder')
-              }
-              placeholderTextColor={Palette.textMuted}
+              style={styles.descriptionInput}
+              placeholder={t('home.descriptionPlaceholder')}
+              placeholderTextColor={Theme.colors.outline}
               value={description}
               onChangeText={setDescription}
             />
 
-            {/* Submit button */}
-            <Pressable
-              style={[
-                styles.modalSubmitButton,
-                {
-                  backgroundColor:
-                    actionType === 'CREDIT_SALE'
-                      ? Palette.dangerRed
-                      : Palette.successGreen,
-                },
-              ]}
-              onPress={handleSubmitQuickAction}
-            >
-              <Text style={styles.modalSubmitText}>
-                {t('home.saveTransaction')}
-              </Text>
-            </Pressable>
+            {/* Action Buttons */}
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.submitButton,
+                  actionType === 'CREDIT_SALE'
+                    ? styles.submitButtonCredit
+                    : styles.submitButtonRepay,
+                ]}
+                onPress={handleSubmitQuickAction}
+              >
+                <Text style={styles.submitButtonText}>
+                  {actionType === 'CREDIT_SALE'
+                    ? t('home.saveCreditBtn')
+                    : t('home.saveRepayBtn')}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -314,283 +405,375 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 90,
   },
-  metricsRow: {
-    marginBottom: 10,
-  },
-  metricsTwoCol: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginVertical: 6,
-  },
-  quickActionButton: {
-    flex: 1,
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  creditSaleButton: {
-    borderColor: '#FECACA',
-  },
-  repaymentButton: {
-    borderColor: '#A7F3D0',
-  },
-  quickActionIconRed: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Palette.dangerRedLight,
+  headerIconButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  quickActionIconGreen: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Palette.successGreenLight,
+  notificationAlertDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Theme.colors.moneyRed,
+  },
+
+  /* Monolithic Deep Navy Masthead */
+  heroPanel: {
+    backgroundColor: Theme.colors.primaryContainer,
+    margin: Theme.spacing.gutter,
+    padding: Theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.none,
+  },
+  heroSubLabel: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.surfaceVariant,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  heroAmount: {
+    color: Theme.colors.onPrimary,
+    marginTop: 2,
+    marginBottom: Theme.spacing.md,
+  },
+  heroDualRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+    paddingTop: Theme.spacing.md,
+  },
+  heroColLeft: {
+    flex: 1,
+    paddingRight: Theme.spacing.sm,
+  },
+  heroColRight: {
+    flex: 1,
+    paddingLeft: Theme.spacing.sm,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  heroColLabel: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.surfaceVariant,
+    fontWeight: '500',
+  },
+  heroColValue: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onPrimary,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  heroColValueGreen: {
+    ...Theme.typography.currencyStat,
+    color: Theme.colors.secondaryContainer,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+
+  /* Quick Actions Bar */
+  quickActionBar: {
+    flexDirection: 'row',
+    marginHorizontal: Theme.spacing.gutter,
+    marginBottom: Theme.spacing.md,
+    gap: 8,
+  },
+  quickActionBtn: {
+    flex: 1,
+    height: Theme.layout.minTouchTarget,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    borderRadius: Theme.radii.none,
   },
-  quickActionTextCol: {
-    flex: 1,
-  },
-  quickActionTitleRed: {
-    fontSize: 14,
+  quickActionBtnLeft: {},
+  quickActionTextRed: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.moneyRed,
     fontWeight: '700',
-    color: Palette.dangerRed,
+    fontSize: 15,
   },
-  quickActionTitleGreen: {
-    fontSize: 14,
+  quickActionTextGreen: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.moneyGreen,
     fontWeight: '700',
-    color: Palette.successGreen,
+    fontSize: 15,
   },
-  quickActionSub: {
-    fontSize: 10,
-    color: Palette.textSecondary,
-    marginTop: 1,
-  },
-  recommendationCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 14,
-    marginVertical: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Palette.primaryBlue,
-  },
-  recHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  recBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  recBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Palette.primaryBlueDark,
-    letterSpacing: 0.5,
-  },
-  recDate: {
-    fontSize: 10,
-    color: Palette.textMuted,
-  },
-  recTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-    marginBottom: 4,
-  },
-  recDescription: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  recActionButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: Palette.primaryBlueLight,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  recActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.primaryBlueDark,
+
+  /* Sections & Ruled Ledger Groups */
+  sectionContainer: {
+    marginTop: Theme.spacing.md,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
-    marginBottom: 8,
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.gutter,
+    marginBottom: 6,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+  sectionHeaderLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: Theme.spacing.gutter,
+    marginBottom: 6,
   },
   viewAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.primaryBlue,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.secondary,
+    fontWeight: '700',
   },
-  transactionsCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    overflow: 'hidden',
+  ledgerGroup: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
   },
-  footerNote: {
+  ledgerRow: {
+    minHeight: 56,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 20,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+  },
+  ledgerRowTextCol: {
+    flex: 1,
+    paddingRight: Theme.spacing.sm,
+  },
+  ledgerRowTitle: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onSurface,
+    fontWeight: '700',
+  },
+  ledgerRowSubtitle: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 2,
+  },
+  actionPillBtn: {
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: 6,
+  },
+  actionPillText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.secondary,
+    fontWeight: '700',
+  },
+  ledgerRowAmountCol: {
+    alignItems: 'flex-end',
+  },
+  transactionAmount: {
+    ...Theme.typography.currencyStat,
+    fontWeight: '700',
+  },
+  amountRed: {
+    color: Theme.colors.moneyRed,
+  },
+  amountGreen: {
+    color: Theme.colors.moneyGreen,
+  },
+  transactionLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  emptyRow: {
+    padding: Theme.spacing.xl,
+    alignItems: 'center',
+  },
+  emptyRowText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+  },
+
+  /* Footer Note */
+  footerNote: {
+    paddingVertical: Theme.spacing.xl,
+    paddingHorizontal: Theme.spacing.gutter,
+    alignItems: 'center',
   },
   footerNoteText: {
-    fontSize: 11,
-    color: Palette.textMuted,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
+
+  /* Contextual Floating Mic Action Button */
+  voiceFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 20,
+    height: 48,
+    paddingHorizontal: 16,
+    borderRadius: Theme.radii.full,
+    backgroundColor: Theme.colors.primaryContainer,
+    borderWidth: 1,
+    borderColor: Theme.colors.primaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  voiceFabText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onPrimary,
+    fontWeight: '700',
+  },
+
+  /* Quick Action Modal */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Palette.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 32,
+    backgroundColor: Theme.colors.surface,
+    borderTopWidth: 1,
+    borderColor: Theme.colors.hairline,
+    padding: Theme.spacing.gutter,
+    paddingBottom: 36,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: Theme.spacing.lg,
   },
   modalTitle: {
-    fontSize: 18,
+    ...Theme.typography.titleMd,
+    color: Theme.colors.onSurface,
     fontWeight: '700',
-    color: Palette.darkNavy,
   },
   inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.darkNavy,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 6,
-    marginTop: 8,
+    marginTop: 10,
   },
   customerChipsRow: {
-    marginBottom: 12,
+    marginBottom: Theme.spacing.md,
   },
   customerChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: Palette.background,
+    borderRadius: Theme.radii.none,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
     marginRight: 8,
     alignItems: 'center',
   },
   customerChipSelected: {
-    backgroundColor: Palette.primaryBlueLight,
-    borderColor: Palette.primaryBlue,
+    borderColor: Theme.colors.primaryContainer,
+    backgroundColor: Theme.colors.primaryContainer,
   },
   customerChipText: {
-    fontSize: 13,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
     fontWeight: '600',
-    color: Palette.textPrimary,
   },
   customerChipTextSelected: {
-    color: Palette.primaryBlueDark,
+    color: Theme.colors.onPrimary,
   },
   chipDue: {
-    fontSize: 10,
-    color: Palette.dangerRed,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyRed,
     marginTop: 2,
   },
   chipDueSelected: {
-    color: Palette.dangerRed,
-    fontWeight: '700',
+    color: Theme.colors.onPrimary,
   },
-  amountInputWrapper: {
+  amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    marginBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: Theme.colors.primaryContainer,
+    paddingVertical: 4,
+    marginBottom: Theme.spacing.md,
   },
-  currencySymbol: {
-    fontSize: 22,
+  rupeeSign: {
+    fontSize: 24,
     fontWeight: '700',
-    color: Palette.darkNavy,
-    marginRight: 6,
+    color: Theme.colors.primaryContainer,
+    marginRight: 8,
   },
   amountInput: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
-    color: Palette.darkNavy,
-    paddingVertical: 10,
+    color: Theme.colors.onSurface,
+    paddingVertical: 4,
   },
-  textInput: {
-    backgroundColor: Palette.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  descriptionInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    paddingVertical: 8,
     fontSize: 14,
-    color: Palette.textPrimary,
-    marginBottom: 16,
+    color: Theme.colors.onSurface,
+    marginBottom: Theme.spacing.lg,
   },
-  modalSubmitButton: {
-    borderRadius: 10,
-    paddingVertical: 14,
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: Theme.spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
+    height: Theme.layout.minTouchTarget,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modalSubmitText: {
-    fontSize: 15,
+  cancelButtonText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+    fontWeight: '600',
+  },
+  submitButton: {
+    flex: 2,
+    height: Theme.layout.minTouchTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonCredit: {
+    backgroundColor: Theme.colors.moneyRed,
+  },
+  submitButtonRepay: {
+    backgroundColor: Theme.colors.moneyGreen,
+  },
+  submitButtonText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onPrimary,
     fontWeight: '700',
-    color: Palette.white,
   },
 });
