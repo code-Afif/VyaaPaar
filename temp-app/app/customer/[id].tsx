@@ -59,25 +59,27 @@ export default function CustomerDetailScreen() {
   const [isUpdating, setIsUpdating] = useState(false);
   const isUpdatingRef = useRef(false);
 
-  // Compute running balance chronologically (oldest to newest) strictly in integer paise
+  // Anchored backwards from customer.currentBalancePaise (newest entry = current balance).
+  // Note: If transactions loaded in memory represent a recent window (e.g. 50 entries) rather
+  // than the full historical ledger, running balances prior to the window reflect the relative delta
+  // backwards from the real authoritative current balance. Integer paise only.
+  const currentBalance = customer?.currentBalancePaise || 0;
   const transactionsWithRunningBalance = useMemo<LedgerEntryWithBalance[]>(() => {
-    const chronologicallyOrdered = [...transactions].reverse();
-    let cumulativePaise = 0;
+    let running = currentBalance;
 
-    const withBalance = chronologicallyOrdered.map((entry) => {
+    return transactions.map((entry) => {
+      const balanceForThisRow = running;
       if (entry.type === 'CREDIT_SALE') {
-        cumulativePaise += entry.amountPaise;
+        running -= entry.amountPaise;
       } else {
-        cumulativePaise = Math.max(0, cumulativePaise - entry.amountPaise);
+        running += entry.amountPaise;
       }
       return {
         ...entry,
-        runningBalancePaise: cumulativePaise,
+        runningBalancePaise: balanceForThisRow,
       };
     });
-
-    return withBalance.reverse();
-  }, [transactions]);
+  }, [transactions, currentBalance]);
 
   if (!customer) {
     return (
@@ -212,6 +214,8 @@ export default function CustomerDetailScreen() {
     }
   };
 
+  const cleanDialPhone = customer.phone?.replace(/[^0-9+]/g, '') || '';
+  const hasPhone = Boolean(cleanDialPhone);
   const maskedPhone = formatDisplayPhone(customer.phone);
 
   return (
@@ -274,11 +278,11 @@ export default function CustomerDetailScreen() {
 
           {/* Quick Contact Action Pills */}
           <View style={styles.contactActionsRow}>
-            {customer.phone ? (
+            {hasPhone ? (
               <>
                 <Pressable
                   style={styles.contactPill}
-                  onPress={() => Linking.openURL(`tel:${customer.phone}`)}
+                  onPress={() => Linking.openURL(`tel:${cleanDialPhone}`)}
                   accessibilityLabel={t('customerDetail.actionCall')}
                 >
                   <Ionicons name="call" size={15} color={Theme.colors.onPrimary} />
@@ -300,21 +304,7 @@ export default function CustomerDetailScreen() {
                   </Pressable>
                 )}
               </>
-            ) : (
-              <Pressable
-                style={styles.contactPillSecondary}
-                onPress={handleOpenEditModal}
-              >
-                <Ionicons
-                  name="call-outline"
-                  size={14}
-                  color={Theme.colors.onSurfaceVariant}
-                />
-                <Text style={styles.contactPillTextSecondary}>
-                  {t('customerDetail.noPhone')} · {t('customerDetail.editCustomerBtn')}
-                </Text>
-              </Pressable>
-            )}
+            ) : null}
           </View>
         </View>
 
