@@ -23,6 +23,7 @@ import {
 } from '@/data/seedData';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { supabaseService } from '@/services/supabaseService';
+import { isCreatedToday } from '@/utils/date';
 
 export interface MerchantProfile {
   id?: string;
@@ -214,14 +215,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const totalCollectedTodayPaise = useMemo(() => {
     const baseline = isDemoMode ? 920000 : 0;
     return ledgerEntries
-      .filter((l) => l.type === 'REPAYMENT' && (l.createdAt.includes('Today') || l.createdAt.includes('Just now')))
+      .filter((l) => l.type === 'REPAYMENT' && isCreatedToday(l.createdAtIso))
       .reduce((sum, l) => sum + l.amountPaise, baseline);
   }, [ledgerEntries, isDemoMode]);
 
   const totalSalesTodayPaise = useMemo(() => {
     const baseline = isDemoMode ? 1485000 : 0;
     return ledgerEntries
-      .filter((l) => l.type === 'CREDIT_SALE' && (l.createdAt.includes('Today') || l.createdAt.includes('Just now')))
+      .filter((l) => l.type === 'CREDIT_SALE' && isCreatedToday(l.createdAtIso))
       .reduce((sum, l) => sum + l.amountPaise, baseline);
   }, [ledgerEntries, isDemoMode]);
 
