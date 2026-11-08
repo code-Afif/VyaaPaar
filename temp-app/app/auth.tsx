@@ -13,7 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -54,7 +54,7 @@ export default function AuthScreen() {
 
   /**
    * Handle Email + Password Submission
-   * Pure password-only authentication flow using Supabase Auth
+   * Pure password-only authentication flow using Supabase Auth (no OTP/2FA)
    */
   const handleCredentialsSubmit = async () => {
     setErrorMessage(null);
@@ -160,144 +160,143 @@ export default function AuthScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Top Header Bar matching Stitch */}
+        <View style={styles.topHeader}>
+          <View style={styles.brandRow}>
+            <Ionicons name="book" size={20} color={Theme.colors.primary} />
+            <Text style={styles.brandTitle}>DukaanSaathi</Text>
+          </View>
+          <View style={styles.topRightActions}>
+            <Pressable
+              style={styles.langPill}
+              onPress={() => router.push('/language?from=settings')}
+              accessibilityLabel={t('common.changeLanguage')}
+            >
+              <Ionicons name="globe-outline" size={13} color={Theme.colors.onSurface} />
+              <Text style={styles.langPillText}>{getLangCodeDisplay()}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.closeBtn}
+              hitSlop={10}
+              accessibilityLabel={t('common.close')}
+            >
+              <Ionicons name="close" size={20} color={Theme.colors.onSurface} />
+            </Pressable>
+          </View>
+        </View>
+
         <ScrollView
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Header Close / Back & Language Switcher */}
-          <View style={styles.topBar}>
-            <Pressable
-              onPress={() => router.back()}
-              style={styles.backButton}
-              hitSlop={12}
-              accessibilityLabel="Back"
-            >
-              <Ionicons name="close" size={24} color={Palette.darkNavy} />
-            </Pressable>
-
-            <View style={styles.topRightRow}>
-              {/* Language Switcher */}
-              <Pressable
-                style={styles.langBtn}
-                onPress={() => router.push('/language?from=settings')}
-                accessibilityLabel={t('common.changeLanguage')}
-              >
-                <Ionicons name="globe-outline" size={14} color={Palette.darkNavy} />
-                <Text style={styles.langBtnText}>{getLangCodeDisplay()}</Text>
-              </Pressable>
-
-              <View style={styles.brandBadge}>
-                <Ionicons name="shield-checkmark" size={15} color={Palette.primaryBlueDark} />
-                <Text style={styles.brandBadgeText}>{t('auth.cloudSecured')}</Text>
-              </View>
+          {/* Brand Anchor Area */}
+          <View style={styles.brandAnchor}>
+            <View style={styles.trustBadge}>
+              <View style={styles.trustDot} />
+              <Text style={styles.trustBadgeText}>PRATISHTHA • VISHWAS</Text>
             </View>
+            <Text style={styles.mainTitle}>DukaanSaathi</Text>
+            <Text style={styles.mainSubtitle}>Aapka Digital Bahi-Khata</Text>
           </View>
 
-          {/* Logo & Heading */}
-          <View style={styles.heroSection}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="storefront" size={34} color={Palette.primaryBlueDark} />
-            </View>
+          {/* Segmented Mode Selector */}
+          <View style={styles.modeTabs}>
+            <Pressable
+              style={[styles.modeTab, mode === 'SIGN_IN' && styles.modeTabActive]}
+              onPress={() => {
+                setMode('SIGN_IN');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.modeTabText,
+                  mode === 'SIGN_IN' && styles.modeTabTextActive,
+                ]}
+              >
+                {t('auth.tabSignIn')}
+              </Text>
+            </Pressable>
 
-            <Text style={styles.heroTitle}>
-              {mode === 'SIGN_IN' ? t('auth.titleSignIn') : t('auth.titleSignUp')}
-            </Text>
-
-            <Text style={styles.heroSubtitle}>
-              {mode === 'SIGN_IN' ? t('auth.subtitleSignIn') : t('auth.subtitleSignUp')}
-            </Text>
+            <Pressable
+              style={[styles.modeTab, mode === 'SIGN_UP' && styles.modeTabActive]}
+              onPress={() => {
+                setMode('SIGN_UP');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.modeTabText,
+                  mode === 'SIGN_UP' && styles.modeTabTextActive,
+                ]}
+              >
+                {t('auth.tabSignUp')}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Banner Notifications */}
           {errorMessage ? (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={20} color={Palette.dangerRed} />
+              <Ionicons name="alert-circle" size={18} color={Theme.colors.moneyRed} />
               <Text style={styles.errorBannerText}>{errorMessage}</Text>
             </View>
           ) : null}
 
           {successMessage ? (
             <View style={styles.successBanner}>
-              <Ionicons name="checkmark-circle" size={20} color={Palette.successGreen} />
+              <Ionicons name="checkmark-circle" size={18} color={Theme.colors.moneyGreen} />
               <Text style={styles.successBannerText}>{successMessage}</Text>
             </View>
           ) : null}
 
-          {/* Credentials Form */}
-          <View style={styles.card}>
-            {/* Mode Toggle */}
-            <View style={styles.toggleRow}>
-              <Pressable
-                style={[styles.toggleBtn, mode === 'SIGN_IN' && styles.toggleBtnActive]}
-                onPress={() => {
-                  setMode('SIGN_IN');
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-              >
-                <Text
-                  style={[styles.toggleBtnText, mode === 'SIGN_IN' && styles.toggleBtnTextActive]}
-                >
-                  {t('auth.tabSignIn')}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.toggleBtn, mode === 'SIGN_UP' && styles.toggleBtnActive]}
-                onPress={() => {
-                  setMode('SIGN_UP');
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-              >
-                <Text
-                  style={[styles.toggleBtnText, mode === 'SIGN_UP' && styles.toggleBtnTextActive]}
-                >
-                  {t('auth.tabSignUp')}
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Sign Up Fields */}
+          {/* Form Fields Card */}
+          <View style={styles.formCard}>
+            {/* Sign Up Specific Fields */}
             {mode === 'SIGN_UP' && (
               <>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.storeNameLabel')}</Text>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>{t('auth.storeNameLabel')}</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="business" size={18} color={Palette.textSecondary} />
+                    <Ionicons name="business-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                     <TextInput
                       style={styles.textInput}
                       placeholder={t('auth.storeNamePlaceholder')}
-                      placeholderTextColor={Palette.textMuted}
+                      placeholderTextColor={Theme.colors.outline}
                       value={storeName}
                       onChangeText={setStoreName}
                     />
                   </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.ownerNameLabel')}</Text>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>{t('auth.ownerNameLabel')}</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="person" size={18} color={Palette.textSecondary} />
+                    <Ionicons name="person-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                     <TextInput
                       style={styles.textInput}
                       placeholder={t('auth.ownerNamePlaceholder')}
-                      placeholderTextColor={Palette.textMuted}
+                      placeholderTextColor={Theme.colors.outline}
                       value={ownerName}
                       onChangeText={setOwnerName}
                     />
                   </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.phoneLabel')}</Text>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>{t('auth.phoneLabel')}</Text>
                   <View style={styles.inputWrapper}>
-                    <Ionicons name="call" size={18} color={Palette.textSecondary} />
+                    <Ionicons name="call-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                     <TextInput
                       style={styles.textInput}
                       placeholder={t('auth.phonePlaceholder')}
-                      placeholderTextColor={Palette.textMuted}
+                      placeholderTextColor={Theme.colors.outline}
                       keyboardType="phone-pad"
                       value={phone}
                       onChangeText={setPhone}
@@ -307,15 +306,18 @@ export default function AuthScreen() {
               </>
             )}
 
-            {/* Email Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('auth.emailLabel')}</Text>
+            {/* Email Field */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.fieldLabelRow}>
+                <Text style={styles.fieldLabel}>{t('auth.emailLabel')}</Text>
+                <Text style={styles.fieldHint}>Khatadhari ID</Text>
+              </View>
               <View style={styles.inputWrapper}>
-                <Ionicons name="mail" size={18} color={Palette.textSecondary} />
+                <Ionicons name="mail-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                 <TextInput
                   style={styles.textInput}
                   placeholder={t('auth.emailPlaceholder')}
-                  placeholderTextColor={Palette.textMuted}
+                  placeholderTextColor={Theme.colors.outline}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   value={email}
@@ -324,72 +326,83 @@ export default function AuthScreen() {
               </View>
             </View>
 
-            {/* Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('auth.passwordLabel')}</Text>
+            {/* Password Field */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.fieldLabelRow}>
+                <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
+              </View>
               <View style={styles.inputWrapper}>
-                <Ionicons name="lock-closed" size={18} color={Palette.textSecondary} />
+                <Ionicons name="lock-closed-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                 <TextInput
                   style={styles.textInput}
                   placeholder={t('auth.passwordPlaceholder')}
-                  placeholderTextColor={Palette.textMuted}
+                  placeholderTextColor={Theme.colors.outline}
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />
                 <Pressable
                   onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIconBtn}
+                  style={styles.eyeBtn}
                   hitSlop={8}
                 >
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={Palette.textSecondary}
-                  />
+                  <Text style={styles.eyeBtnText}>
+                    {showPassword ? 'Chhupayein' : 'Dikhayein'}
+                  </Text>
                 </Pressable>
               </View>
             </View>
 
             {/* Submit Button */}
             <Pressable
-              style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+              style={[styles.submitButton, isLoading && styles.buttonDisabled]}
               onPress={handleCredentialsSubmit}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={Palette.white} size="small" />
+                <ActivityIndicator color={Theme.colors.onPrimary} size="small" />
               ) : (
-                <>
-                  <Text style={styles.primaryButtonText}>
+                <View style={styles.submitBtnContent}>
+                  <Text style={styles.submitButtonText}>
                     {mode === 'SIGN_IN' ? t('auth.btnSignIn') : t('auth.btnSignUp')}
                   </Text>
-                  <Ionicons name="arrow-forward" size={18} color={Palette.white} />
-                </>
+                  <Ionicons name="arrow-forward" size={18} color={Theme.colors.onPrimary} />
+                </View>
               )}
             </Pressable>
-
-            <Text style={styles.securityNote}>
-              {t('auth.cloudSecured')}
-            </Text>
           </View>
 
-          {/* Demo Mode Fallback Option */}
-          <View style={styles.demoModeSection}>
+          {/* Reassurance Info Card */}
+          <View style={styles.reassuranceCard}>
+            <Ionicons name="receipt-outline" size={20} color={Theme.colors.primaryContainer} />
+            <View style={styles.reassuranceTextCol}>
+              <Text style={styles.reassuranceTitle}>Rozana Hisaab-Kitab</Text>
+              <Text style={styles.reassuranceSub}>
+                Dukaan ka har ek udhaar aur jama ab ek jagah, 100% surakshit aur aasan.
+              </Text>
+            </View>
+          </View>
+
+          {/* Demo Mode Button */}
+          <View style={styles.demoSection}>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>OR</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            <Pressable style={styles.demoButton} onPress={handleContinueDemo}>
-              <Ionicons name="play-circle-outline" size={20} color={Palette.primaryBlueDark} />
-              <Text style={styles.demoButtonText}>
-                {t('auth.exploreDemo')}
-              </Text>
+            <Pressable style={styles.demoBtn} onPress={handleContinueDemo}>
+              <Ionicons name="play-circle-outline" size={18} color={Theme.colors.primaryContainer} />
+              <Text style={styles.demoBtnText}>{t('auth.exploreDemo')}</Text>
             </Pressable>
-            <Text style={styles.demoNote}>
-              {t('auth.demoDesc')}
+            <Text style={styles.demoNoteText}>{t('auth.demoDesc')}</Text>
+          </View>
+
+          {/* Grounded Security Footer */}
+          <View style={styles.securityFooter}>
+            <Ionicons name="lock-closed" size={14} color={Theme.colors.outline} />
+            <Text style={styles.securityFooterText}>
+              Aapka ledger data encrypted aur surakshit hai
             </Text>
           </View>
         </ScrollView>
@@ -401,272 +414,315 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   keyboardView: {
     flex: 1,
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  topBar: {
+  topHeader: {
+    height: 56,
+    paddingHorizontal: Theme.spacing.gutter,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceCard,
   },
-  topRightRow: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  langBtn: {
+  brandTitle: {
+    ...Theme.typography.titleMd,
+    fontWeight: '700',
+    color: Theme.colors.primary,
+  },
+  topRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    gap: 10,
   },
-  langBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  backButton: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: Palette.card,
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  brandBadge: {
+  langPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Palette.primaryBlueLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    backgroundColor: Theme.colors.surface,
   },
-  brandBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Palette.primaryBlueDark,
+  langPillText: {
+    ...Theme.typography.bodySm,
+    fontWeight: '600',
+    color: Theme.colors.onSurface,
   },
-  heroSection: {
+  closeBtn: {
+    padding: 6,
+  },
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: Theme.colors.surface,
+  },
+  scrollContent: {
+    padding: Theme.spacing.gutter,
+    gap: Theme.spacing.lg,
+    paddingBottom: 40,
+  },
+
+  /* Brand Anchor */
+  brandAnchor: {
+    marginTop: 8,
+    gap: 6,
+  },
+  trustBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderRadius: Theme.radii.sm,
   },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Palette.primaryBlueLight,
+  trustDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Theme.colors.primaryContainer,
+  },
+  trustBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
+  },
+  mainTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: Theme.colors.primary,
+    letterSpacing: -0.5,
+  },
+  mainSubtitle: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+  },
+
+  /* Mode Tabs */
+  modeTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: '#BAE6FD',
   },
-  heroTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Palette.darkNavy,
-    marginBottom: 6,
-    textAlign: 'center',
+  modeTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: Theme.colors.primaryContainer,
   },
-  heroSubtitle: {
-    fontSize: 13,
-    color: Palette.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    lineHeight: 18,
+  modeTabText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.outline,
+    fontWeight: '500',
   },
+  modeTabTextActive: {
+    color: Theme.colors.primary,
+    fontWeight: '700',
+  },
+
+  /* Banners */
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: Theme.colors.moneyRedBg,
+    borderWidth: 1,
+    borderColor: Theme.colors.moneyRedBorder,
+    borderRadius: Theme.radii.sm,
+    padding: 10,
   },
   errorBannerText: {
-    flex: 1,
-    fontSize: 13,
-    color: Palette.dangerRed,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.moneyRed,
     fontWeight: '600',
+    flex: 1,
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.successGreenLight,
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
     gap: 8,
+    backgroundColor: Theme.colors.moneyGreenBg,
+    borderWidth: 1,
+    borderColor: Theme.colors.moneyGreenBorder,
+    borderRadius: Theme.radii.sm,
+    padding: 10,
   },
   successBannerText: {
-    flex: 1,
-    fontSize: 13,
-    color: Palette.successGreen,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.moneyGreen,
     fontWeight: '600',
+    flex: 1,
   },
-  card: {
-    backgroundColor: Palette.white,
-    borderRadius: 16,
+
+  /* Form Card */
+  formCard: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderRadius: Theme.radii.md,
     borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: Theme.colors.hairline,
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.md,
   },
-  toggleRow: {
+  fieldGroup: {
+    gap: 6,
+  },
+  fieldLabelRow: {
     flexDirection: 'row',
-    backgroundColor: Palette.background,
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 8,
+    justifyContent: 'space-between',
   },
-  toggleBtnActive: {
-    backgroundColor: Palette.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  toggleBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.textSecondary,
-  },
-  toggleBtnTextActive: {
-    color: Palette.darkNavy,
+  fieldLabel: {
+    ...Theme.typography.bodySm,
     fontWeight: '700',
+    color: Theme.colors.onSurface,
   },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.darkNavy,
-    marginBottom: 6,
+  fieldHint: {
+    fontSize: 10,
+    color: Theme.colors.outline,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.background,
+    height: 48,
     borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 10,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
     paddingHorizontal: 12,
     gap: 8,
+    backgroundColor: Theme.colors.surface,
   },
   textInput: {
     flex: 1,
-    paddingVertical: 11,
-    fontSize: 14,
-    color: Palette.textPrimary,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+    paddingVertical: 0,
   },
-  eyeIconBtn: {
-    padding: 4,
+  eyeBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
-  primaryButton: {
-    backgroundColor: Palette.primaryBlue,
-    borderRadius: 12,
-    paddingVertical: 14,
-    flexDirection: 'row',
+  eyeBtnText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.secondary,
+    fontWeight: '600',
+  },
+  submitButton: {
+    height: 48,
+    backgroundColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     marginTop: 8,
-    marginBottom: 10,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
-  primaryButtonText: {
-    color: Palette.white,
-    fontSize: 15,
+  submitBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  submitButtonText: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onPrimary,
     fontWeight: '700',
   },
-  securityNote: {
-    fontSize: 11,
-    color: Palette.textMuted,
-    textAlign: 'center',
-    lineHeight: 16,
-    marginTop: 4,
+
+  /* Reassurance Card */
+  reassuranceCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    padding: Theme.spacing.md,
   },
-  demoModeSection: {
-    alignItems: 'center',
-    marginTop: 20,
+  reassuranceTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  reassuranceTitle: {
+    ...Theme.typography.bodySm,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+  },
+  reassuranceSub: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    lineHeight: 18,
+  },
+
+  /* Demo Mode Section */
+  demoSection: {
+    gap: 12,
   },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 16,
+    gap: 12,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Palette.border,
+    backgroundColor: Theme.colors.hairline,
   },
   dividerText: {
-    marginHorizontal: 12,
-    fontSize: 11,
-    fontWeight: '700',
-    color: Palette.textMuted,
-    letterSpacing: 0.5,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
   },
-  demoButton: {
+  demoBtn: {
+    height: 44,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    backgroundColor: Theme.colors.surfaceCard,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Palette.white,
-    borderWidth: 1.5,
-    borderColor: Palette.primaryBlue,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    width: '100%',
   },
-  demoButtonText: {
-    fontSize: 13,
+  demoBtnText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.primaryContainer,
     fontWeight: '700',
-    color: Palette.primaryBlueDark,
   },
-  demoNote: {
-    fontSize: 11,
-    color: Palette.textMuted,
+  demoNoteText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
     textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 12,
-    lineHeight: 16,
+  },
+
+  /* Grounded Security Footer */
+  securityFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+  },
+  securityFooterText: {
+    fontSize: 11,
+    color: Theme.colors.outline,
   },
 });
