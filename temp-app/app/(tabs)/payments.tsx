@@ -22,7 +22,8 @@ type PaymentFilter = 'ALL' | 'UNMATCHED' | 'RECONCILED';
 export default function PaymentsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { paymentEvents, reconcilePayment, simulateIncomingPayment, customers } = useApp();
+  const { paymentEvents, reconcilePayment, simulateIncomingPayment, customers, merchant } = useApp();
+  const isDemoMode = merchant.isDemoMode;
 
   const [activeFilter, setActiveFilter] = useState<PaymentFilter>('ALL');
 
@@ -34,10 +35,17 @@ export default function PaymentsScreen() {
     });
   }, [paymentEvents, activeFilter]);
 
-  // Total QR payments strictly computed from paymentEvents
+  // Totals exclude isSimulated events when in real mode (!isDemoMode).
+  // In demo mode, seed events carry isSimulated: true so they are included and labelled.
+  const validPaymentEvents = useMemo(() => {
+    return isDemoMode ? paymentEvents : paymentEvents.filter((p) => !p.isSimulated);
+  }, [paymentEvents, isDemoMode]);
+
+  // Total QR payments strictly computed from real events (or seed events in demo mode)
+  // Labeled as all-time since PaymentEvent has no createdAtIso field.
   const totalCollectedQrPaise = useMemo(() => {
-    return paymentEvents.reduce((sum, p) => sum + p.amountPaise, 0);
-  }, [paymentEvents]);
+    return validPaymentEvents.reduce((sum, p) => sum + p.amountPaise, 0);
+  }, [validPaymentEvents]);
 
   const unmatchedCount = useMemo(() => {
     return paymentEvents.filter((p) => p.status === 'UNMATCHED').length;
@@ -216,22 +224,36 @@ export default function PaymentsScreen() {
         title={t('payments.headerTitle')}
         subtitle={t('payments.headerSubtitle')}
         rightAction={
-          <Pressable
-            style={styles.simulateBtnSmall}
-            onPress={handleSimulatePayment}
-            hitSlop={8}
-            accessibilityLabel={t('payments.simulateBtn')}
-          >
-            <Ionicons name="flash" size={14} color={Theme.colors.primary} />
-            <Text style={styles.simulateBtnSmallText}>Demo Test</Text>
-          </Pressable>
+          isDemoMode ? (
+            <Pressable
+              style={styles.simulateBtnSmall}
+              onPress={handleSimulatePayment}
+              hitSlop={8}
+              accessibilityLabel={t('payments.simulateBtn')}
+            >
+              <Ionicons name="flash" size={14} color={Theme.colors.primary} />
+              <Text style={styles.simulateBtnSmallText}>Demo Test</Text>
+            </Pressable>
+          ) : (
+            <View
+              style={[styles.simulateBtnSmall, { opacity: 0.5 }]}
+              accessibilityLabel="Demo test disabled in live Supabase mode"
+            >
+              <Ionicons name="flash-off-outline" size={14} color={Theme.colors.onSurfaceVariant} />
+              <Text style={[styles.simulateBtnSmallText, { color: Theme.colors.onSurfaceVariant }]}>Live Mode</Text>
+            </View>
+          )
         }
       />
 
       <View style={styles.container}>
         {/* Monolithic QR Aggregates Masthead */}
         <View style={styles.masthead}>
-          <Text style={styles.mastheadLabel}>{t('payments.totalQrPayments')}</Text>
+          <Text style={styles.mastheadLabel}>
+            {isDemoMode
+              ? `${t('payments.totalQrPayments')} (All-Time · Demo)`
+              : `${t('payments.totalQrPayments')} (All-Time)`}
+          </Text>
           <Text style={styles.mastheadAmount}>
             +{formatPaise(totalCollectedQrPaise)}
           </Text>
