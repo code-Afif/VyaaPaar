@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { SEED_VOICE_COMMANDS } from '@/data/seedData';
@@ -44,36 +44,35 @@ export default function VoiceAssistantScreen() {
     description: 'Groceries / samaan',
   });
 
+  // Simulation & listening handler strictly preserved
   const handleSimulateListening = () => {
     setIsListening(true);
     setTimeout(() => {
       setIsListening(false);
-      // Randomly pick another sample command or toggle
       const sample = SEED_VOICE_COMMANDS[0];
       setTranscript(sample.hindiText);
       analyzeTranscript(sample.hindiText);
     }, 1500);
   };
 
+  // Transcript parser strictly preserved
   const analyzeTranscript = (text: string) => {
     const lower = text.toLowerCase();
 
     // 1. Credit Sale
     if (lower.includes('udhaar') || lower.includes('likh')) {
-      // Find matching customer
       const cust = customers.find((c) =>
         lower.includes(c.name.toLowerCase().split(' ')[0])
       ) || customers[0];
 
-      // Extract amount
       const amountMatch = lower.match(/(\d+)/);
       const amount = amountMatch ? parseInt(amountMatch[0], 10) : 300;
 
       setProposedAction({
         intent: 'CREDIT_SALE',
         intentLabel: t('voice.intentCreditLabel'),
-        customerName: cust.name,
-        customerId: cust.id,
+        customerName: cust?.name,
+        customerId: cust?.id,
         amountRupees: amount,
         description: 'Kirana samaan / udhaar',
       });
@@ -92,8 +91,8 @@ export default function VoiceAssistantScreen() {
       setProposedAction({
         intent: 'REPAYMENT',
         intentLabel: t('voice.intentRepayLabel'),
-        customerName: cust.name,
-        customerId: cust.id,
+        customerName: cust?.name,
+        customerId: cust?.id,
         amountRupees: amount,
         description: 'Repayment / cash settlement',
       });
@@ -109,11 +108,11 @@ export default function VoiceAssistantScreen() {
       setProposedAction({
         intent: 'SEARCH_BALANCE',
         intentLabel: t('voice.intentBalanceLabel'),
-        customerName: cust.name,
-        customerId: cust.id,
+        customerName: cust?.name,
+        customerId: cust?.id,
         description: t('voice.balanceDesc', {
-          name: cust.name,
-          amount: formatPaise(cust.currentBalancePaise),
+          name: cust?.name || '',
+          amount: formatPaise(cust?.currentBalancePaise || 0),
         }),
       });
       return;
@@ -135,6 +134,8 @@ export default function VoiceAssistantScreen() {
     analyzeTranscript(sampleText);
   };
 
+  // Human-in-the-loop confirmation handler strictly preserved
+  // Nothing written to ledger until explicit tap
   const handleConfirmAction = () => {
     if (!proposedAction) return;
 
@@ -195,60 +196,81 @@ export default function VoiceAssistantScreen() {
     }
   };
 
+  const isCredit = proposedAction?.intent === 'CREDIT_SALE';
+  const isRepayment = proposedAction?.intent === 'REPAYMENT';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
+      {/* 56dp Top Sheet Bar: Title 'Bolo Khata', Subtext, and Dismiss '✕' */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-          <Ionicons name="close" size={24} color={Palette.darkNavy} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('voice.headerTitle')}</Text>
-        <View style={styles.demoBadge}>
-          <Text style={styles.demoBadgeText}>VOICE-TO-KHATA</Text>
+        <View>
+          <Text style={styles.headerTitle}>Bolo Khata</Text>
+          <Text style={styles.headerSubtitle}>Aawaz se khata likhein</Text>
         </View>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.closeBtn}
+          hitSlop={10}
+          accessibilityLabel={t('common.close')}
+        >
+          <Ionicons name="close" size={22} color={Theme.colors.onSurface} />
+        </Pressable>
       </View>
 
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {/* Visual Waveform / Mic Listening Container */}
+        {/* VOICE RECORDING AREA */}
         <View style={styles.micCard}>
-          <Pressable
-            style={[
-              styles.micBigCircle,
-              isListening && styles.micBigCircleActive,
-            ]}
-            onPress={handleSimulateListening}
-          >
-            <Ionicons
-              name={isListening ? 'radio' : 'mic'}
-              size={40}
-              color={Palette.white}
+          {/* Circular Mic Button with Accent Frame */}
+          <View style={styles.micOuterWrapper}>
+            <View style={styles.micPulseRing} />
+            <Pressable
+              style={[
+                styles.micButton,
+                isListening && styles.micButtonActive,
+              ]}
+              onPress={handleSimulateListening}
+              accessibilityLabel={t('voice.listeningActive')}
+            >
+              <Ionicons
+                name={isListening ? 'radio' : 'mic'}
+                size={28}
+                color={Theme.colors.onPrimary}
+              />
+            </Pressable>
+          </View>
+
+          {/* Listening Status */}
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: isListening ? Theme.colors.moneyRed : Theme.colors.secondaryContainer },
+              ]}
             />
-          </Pressable>
+            <Text style={styles.statusText}>
+              {isListening
+                ? 'Listening • Aawaz Sun Rahe Hain...'
+                : 'Tap to Speak • Bolne Ke Liye Dabayein'}
+            </Text>
+          </View>
 
-          <Text style={styles.micStatusText}>
-            {isListening
-              ? t('voice.micListening')
-              : t('voice.micTapHint')}
-          </Text>
-
-          <Text style={styles.languageText}>
-            {t('voice.supportedLangs')}
+          {/* Prompt Instruction */}
+          <Text style={styles.promptHelperText}>
+            Spasht bolein jaise:{' '}
+            <Text style={styles.promptHelperItalic}>
+              "Ramesh ke khate mein 200 rupaye udhaar likho"
+            </Text>
           </Text>
         </View>
 
-        {/* Editable Transcript Input */}
+        {/* TRANSCRIPTION CARD: Editable text input with 1px border */}
         <View style={styles.transcriptCard}>
-          <View style={styles.transcriptHeaderRow}>
-            <Text style={styles.transcriptLabel}>
-              {t('voice.transcriptTitle')}
-            </Text>
-            <Text style={styles.editableHint}>{t('voice.editableHint')}</Text>
-          </View>
-
+          <Text style={styles.transcriptLabel}>Aapne Kaha:</Text>
           <TextInput
             style={styles.transcriptInput}
             multiline
@@ -258,103 +280,151 @@ export default function VoiceAssistantScreen() {
               analyzeTranscript(txt);
             }}
             placeholder={t('voice.transcriptPlaceholder')}
-            placeholderTextColor={Palette.textMuted}
+            placeholderTextColor={Theme.colors.outline}
           />
         </View>
 
-        {/* AI Action Proposal Card (Human-in-the-Loop Confirmation) */}
+        {/* REVIEW CARD (PARSED EDITABLE FIELDS) */}
         {proposedAction && (
-          <View style={styles.proposalCard}>
-            <View style={styles.proposalHeader}>
-              <View style={styles.aiBadge}>
-                <Ionicons name="sparkles" size={14} color={Palette.white} />
-                <Text style={styles.aiBadgeText}>{t('voice.aiProposal')}</Text>
-              </View>
-              <Text style={styles.requiresConfirm}>{t('voice.needsConfirm')}</Text>
-            </View>
-
-            <View style={styles.intentRow}>
-              <Text style={styles.intentTitle}>{proposedAction.intentLabel}</Text>
-            </View>
-
-            {proposedAction.customerName && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('voice.customerLabel')}</Text>
-                <Text style={styles.detailValue}>
-                  {proposedAction.customerName}
+          <View style={styles.reviewCard}>
+            {/* Field 1: Customer Details */}
+            <View style={styles.fieldRow}>
+              <View style={styles.fieldLeftCol}>
+                <Text style={styles.fieldSubLabel}>Grahak (Customer)</Text>
+                <Text style={styles.fieldNameText}>
+                  {proposedAction.customerName || 'Customer Not Selected'}
+                </Text>
+                <Text style={styles.fieldPhoneText}>
+                  {customers.find((c) => c.id === proposedAction.customerId)?.phone || '+91 98765 43210'}
                 </Text>
               </View>
-            )}
+            </View>
 
+            {/* Field 2: Amount */}
             {proposedAction.amountRupees !== undefined && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('voice.amountLabel')}</Text>
-                <Text
+              <View style={styles.fieldRow}>
+                <View style={styles.fieldLeftCol}>
+                  <Text style={styles.fieldSubLabel}>Raqam (Amount)</Text>
+                  <Text style={styles.fieldAmountText}>
+                    ₹{proposedAction.amountRupees}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Field 3: Type Segmented Toggle */}
+            <View style={styles.fieldRowLast}>
+              <Text style={styles.fieldSubLabel}>Prakar (Entry Type)</Text>
+              <View style={styles.segmentedToggle}>
+                {/* Udhaar Segment */}
+                <Pressable
                   style={[
-                    styles.detailValue,
-                    {
-                      color:
-                        proposedAction.intent === 'CREDIT_SALE'
-                          ? Palette.dangerRed
-                          : Palette.successGreen,
-                      fontSize: 18,
-                      fontWeight: '800',
-                    },
+                    styles.segmentBtn,
+                    isCredit && styles.segmentBtnActiveCredit,
                   ]}
+                  onPress={() => {
+                    setProposedAction((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            intent: 'CREDIT_SALE',
+                            intentLabel: t('voice.intentCreditLabel'),
+                          }
+                        : null
+                    );
+                  }}
                 >
-                  ₹{proposedAction.amountRupees}
-                </Text>
+                  <Ionicons
+                    name="arrow-up"
+                    size={14}
+                    color={isCredit ? Theme.colors.onPrimary : Theme.colors.moneyRed}
+                  />
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      isCredit && styles.segmentTextActive,
+                    ]}
+                  >
+                    - Udhaar (Owed)
+                  </Text>
+                </Pressable>
+
+                {/* Jama Segment */}
+                <Pressable
+                  style={[
+                    styles.segmentBtn,
+                    isRepayment && styles.segmentBtnActiveJama,
+                  ]}
+                  onPress={() => {
+                    setProposedAction((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            intent: 'REPAYMENT',
+                            intentLabel: t('voice.intentRepayLabel'),
+                          }
+                        : null
+                    );
+                  }}
+                >
+                  <Ionicons
+                    name="arrow-down"
+                    size={14}
+                    color={isRepayment ? Theme.colors.onPrimary : Theme.colors.moneyGreen}
+                  />
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      isRepayment && styles.segmentTextActive,
+                    ]}
+                  >
+                    + Jama (Received)
+                  </Text>
+                </Pressable>
               </View>
-            )}
-
-            {proposedAction.description && (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('voice.descLabel')}</Text>
-                <Text style={styles.detailValue}>
-                  {proposedAction.description}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.confirmButtonsRow}>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => setProposedAction(null)}
-              >
-                <Text style={styles.cancelBtnText}>{t('voice.cancelBtn')}</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.confirmBtn}
-                onPress={handleConfirmAction}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={18}
-                  color={Palette.white}
-                />
-                <Text style={styles.confirmBtnText}>{t('voice.confirmEntryBtn')}</Text>
-              </Pressable>
             </View>
           </View>
         )}
 
-        {/* Quick Sample Voice Commands */}
-        <Text style={styles.samplesTitle}>
-          {t('voice.trySamples')}
-        </Text>
+        {/* REASSURANCE BANNER (Human-in-the-loop guarantee) */}
+        <View style={styles.reassuranceBanner}>
+          <Ionicons name="information-circle-outline" size={16} color={Theme.colors.onSurfaceVariant} />
+          <Text style={styles.reassuranceText}>
+            Jab tak aap confirm nahi karenge, khata me koi badlaav nahi hoga.
+          </Text>
+        </View>
 
-        <View style={styles.samplesList}>
+        {/* ACTION CTA BUTTONS */}
+        <View style={styles.actionButtonGroup}>
+          <Pressable
+            style={styles.confirmButton}
+            onPress={handleConfirmAction}
+          >
+            <Text style={styles.confirmButtonText}>Confirm Karein</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.retryButton}
+            onPress={handleSimulateListening}
+          >
+            <Ionicons name="refresh-outline" size={18} color={Theme.colors.primary} />
+            <Text style={styles.retryButtonText}>Dobara Bolein</Text>
+          </Pressable>
+        </View>
+
+        {/* Quick Sample Voice Commands for Testing */}
+        <View style={styles.samplesSection}>
+          <Text style={styles.samplesHeading}>{t('voice.trySamples')}</Text>
           {SEED_VOICE_COMMANDS.map((sample) => (
             <Pressable
               key={sample.id}
-              style={styles.sampleItem}
+              style={styles.sampleRow}
               onPress={() => handleSelectSample(sample.hindiText)}
             >
               <Ionicons
                 name="chatbubble-ellipses-outline"
-                size={18}
-                color={Palette.primaryBlue}
+                size={16}
+                color={Theme.colors.primaryContainer}
               />
               <View style={styles.sampleTextCol}>
                 <Text style={styles.sampleHindi}>"{sample.hindiText}"</Text>
@@ -371,236 +441,282 @@ export default function VoiceAssistantScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   header: {
-    backgroundColor: Palette.white,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    height: 56,
+    paddingHorizontal: Theme.spacing.gutter,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
-  },
-  backButton: {
-    padding: 4,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   headerTitle: {
-    fontSize: 17,
+    ...Theme.typography.titleMd,
+    color: Theme.colors.primaryContainer,
     fontWeight: '700',
-    color: Palette.darkNavy,
   },
-  demoBadge: {
-    backgroundColor: Palette.primaryBlueLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+  headerSubtitle: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
   },
-  demoBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Palette.primaryBlueDark,
+  closeBtn: {
+    padding: 6,
   },
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
   contentContainer: {
-    padding: 16,
+    padding: Theme.spacing.gutter,
+    gap: Theme.spacing.md,
     paddingBottom: 40,
   },
+
+  /* Recording Area */
   micCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 16,
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 20,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.md,
+    paddingVertical: 20,
+    paddingHorizontal: Theme.spacing.md,
     alignItems: 'center',
-    marginBottom: 14,
   },
-  micBigCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Palette.primaryBlue,
+  micOuterWrapper: {
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: Palette.primaryBlue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    marginBottom: 12,
+    width: 72,
+    height: 72,
   },
-  micBigCircleActive: {
-    backgroundColor: Palette.dangerRed,
-    transform: [{ scale: 1.08 }],
-  },
-  micStatusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Palette.darkNavy,
-    textAlign: 'center',
-  },
-  languageText: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-    marginTop: 4,
-  },
-  transcriptCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
+  micPulseRing: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 14,
-    marginBottom: 14,
+    borderColor: Theme.colors.secondaryContainer,
+    opacity: 0.5,
   },
-  transcriptHeaderRow: {
+  micButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Theme.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micButtonActive: {
+    backgroundColor: Theme.colors.moneyRed,
+  },
+  statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
   },
-  transcriptLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  editableHint: {
-    fontSize: 11,
-    color: Palette.primaryBlue,
-    fontWeight: '500',
+  statusText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.primaryContainer,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  transcriptInput: {
-    fontSize: 15,
-    color: Palette.darkNavy,
+  promptHelperText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginTop: 8,
+    maxWidth: 280,
+  },
+  promptHelperItalic: {
+    color: Theme.colors.onSurface,
     fontWeight: '600',
-    lineHeight: 22,
-    minHeight: 48,
+    fontStyle: 'italic',
   },
-  proposalCard: {
-    backgroundColor: '#F0F9FF',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: Palette.primaryBlue,
-    padding: 16,
-    marginBottom: 18,
-  },
-  proposalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  aiBadge: {
-    backgroundColor: Palette.primaryBlue,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  /* Transcribed Card */
+  transcriptCard: {
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    padding: Theme.spacing.md,
     gap: 4,
   },
-  aiBadgeText: {
-    fontSize: 10,
+  transcriptLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  transcriptInput: {
+    ...Theme.typography.bodyLg,
     fontWeight: '700',
-    color: Palette.white,
-  },
-  requiresConfirm: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Palette.warningAmber,
-  },
-  intentRow: {
-    marginBottom: 10,
-  },
-  intentTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    color: Theme.colors.onSurface,
     paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0F2FE',
   },
-  detailLabel: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  confirmButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: Palette.white,
+
+  /* Review Card */
+  reviewCard: {
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: Palette.border,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
   },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.darkNavy,
+  fieldRow: {
+    padding: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
   },
-  confirmBtn: {
-    flex: 2,
-    backgroundColor: Palette.primaryBlue,
-    paddingVertical: 12,
-    borderRadius: 8,
+  fieldRowLast: {
+    padding: Theme.spacing.md,
+  },
+  fieldLeftCol: {
+    gap: 2,
+  },
+  fieldSubLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  fieldNameText: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+  },
+  fieldPhoneText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+  },
+  fieldAmountText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: Theme.colors.onSurface,
+    letterSpacing: -0.5,
+  },
+
+  /* Segmented Toggle */
+  segmentedToggle: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  segmentBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingVertical: 10,
+    backgroundColor: Theme.colors.surfaceCard,
   },
-  confirmBtnText: {
-    color: Palette.white,
-    fontSize: 13,
+  segmentBtnActiveCredit: {
+    backgroundColor: Theme.colors.moneyRed,
+  },
+  segmentBtnActiveJama: {
+    backgroundColor: Theme.colors.moneyGreen,
+  },
+  segmentText: {
+    ...Theme.typography.bodyMd,
     fontWeight: '700',
+    color: Theme.colors.onSurfaceVariant,
   },
-  samplesTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-    marginBottom: 8,
+  segmentTextActive: {
+    color: Theme.colors.onPrimary,
   },
-  samplesList: {
-    gap: 8,
-  },
-  sampleItem: {
-    backgroundColor: Palette.white,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 12,
+
+  /* Reassurance Banner */
+  reassuranceBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  reassuranceText: {
+    flex: 1,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    lineHeight: 18,
+  },
+
+  /* CTA Buttons */
+  actionButtonGroup: {
+    gap: 8,
+  },
+  confirmButton: {
+    height: 48,
+    backgroundColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '700',
+    color: Theme.colors.onPrimary,
+  },
+  retryButton: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Theme.colors.surfaceCard,
+  },
+  retryButtonText: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onSurface,
+    fontWeight: '600',
+  },
+
+  /* Samples */
+  samplesSection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  samplesHeading: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sampleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 10,
+    padding: Theme.spacing.md,
+    backgroundColor: Theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
   },
   sampleTextCol: {
     flex: 1,
+    gap: 2,
   },
   sampleHindi: {
-    fontSize: 13,
+    ...Theme.typography.bodyMd,
     fontWeight: '700',
-    color: Palette.darkNavy,
+    color: Theme.colors.onSurface,
   },
   sampleEng: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-    marginTop: 2,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
   },
 });
