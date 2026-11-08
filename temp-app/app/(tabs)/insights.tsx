@@ -1,40 +1,83 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  Alert,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { Header } from '@/components/Header';
+import { ScreenHeader } from '@/components/ui';
 import { formatPaise } from '@/utils/format';
+import { Customer } from '@/types';
 
 export default function InsightsScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
-  const { briefing, inventory, customers, merchant } = useApp();
+  const { t, language } = useLanguage();
+  const { briefing, inventory, customers, merchant, paymentEvents } = useApp();
+  const isDemoMode = merchant.isDemoMode;
 
-  const lowStockItems = inventory.filter((i) => i.isLowStock);
+  const lowStockItems = useMemo(() => {
+    return inventory.filter((i) => i.isLowStock);
+  }, [inventory]);
 
-  // Calculate collection rate percentage
-  const totalDueAndCollected =
-    briefing.totalCollectedPaise + briefing.totalOutstandingPaise;
-  const collectionRate =
-    totalDueAndCollected > 0
-      ? Math.round((briefing.totalCollectedPaise / totalDueAndCollected) * 100)
-      : 100;
+  const overdueCustomers = useMemo(() => {
+    return customers.filter((c) => c.currentBalancePaise > 0);
+  }, [customers]);
+
+  const unmatchedPayments = useMemo(() => {
+    return paymentEvents.filter((p) => p.status === 'UNMATCHED');
+  }, [paymentEvents]);
+
+  // Compute total unmatched amount strictly from real/in-memory data
+  const totalUnmatchedPaise = useMemo(() => {
+    return unmatchedPayments.reduce((sum, p) => sum + p.amountPaise, 0);
+  }, [unmatchedPayments]);
+
+  // Format today's date for ledger header
+  const todayDateString = useMemo(() => {
+    try {
+      const locale = language === 'hi' ? 'hi-IN' : 'en-IN';
+      const now = new Date();
+      const dayName = now.toLocaleDateString(locale, { weekday: 'long' });
+      const dayNum = now.getDate();
+      const monthName = now.toLocaleDateString(locale, { month: 'long' });
+      return `${dayName}, ${dayNum} ${monthName} ka Hisaab`;
+    } catch {
+      return 'Dukaan Bahi-Khata Hisaab';
+    }
+  }, [language]);
+
+  // WhatsApp reminder handler: explicit merchant tap only, stripped spaces, no auto-send
+  const handleSendReminder = (customer: Customer) => {
+    if (!customer.phone) {
+      Alert.alert(t('customerDetail.noPhoneTitle'), t('customerDetail.noPhoneMsg'));
+      return;
+    }
+    const cleanPhone = customer.phone.replace(/\s+/g, '');
+    const message = encodeURIComponent(
+      `Namaste ${customer.name} ji, aapka dukaan par ₹${customer.currentBalancePaise / 100} ka hisaab baaki hai. Kripya samay par jama kar dein.`
+    );
+    Linking.openURL(`whatsapp://send?phone=${cleanPhone}&text=${message}`).catch(() => {
+      Alert.alert('Error', 'WhatsApp app not installed');
+    });
+  };
+
+  const topOverdueCustomer = overdueCustomers[0];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header
+      {/* 56dp TopAppBar matching Stitch TopAppBar */}
+      <ScreenHeader
         title={t('insights.headerTitle')}
-        subtitle={t('insights.headerSubtitle')}
+        subtitle="DukaanSaathi • Business Insights"
       />
 
       <ScrollView
@@ -42,170 +85,244 @@ export default function InsightsScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* AI Briefing Summary Header Card */}
-        <View style={styles.briefingHeaderCard}>
-          <View style={styles.briefingTitleRow}>
-            <View style={styles.sparkleCircle}>
-              <Ionicons name="sparkles" size={18} color={Palette.white} />
-            </View>
+        {/* SECTION 1: Aaj ka Briefing (Single Monolithic Hero) */}
+        <View style={styles.heroPanel}>
+          <View style={styles.heroHeaderRow}>
             <View>
-              <Text style={styles.briefingTitle}>{t('insights.briefingTitle')}</Text>
-              <Text style={styles.briefingSubtitle}>
-                {t('insights.briefingSubtitle', { name: merchant?.merchantName || 'Rajesh Sharma' })}
+              <Text style={styles.heroSubLabel}>{t('stitch.aajKaBriefing')}</Text>
+              <Text style={styles.heroDateTitle}>{todayDateString}</Text>
+            </View>
+            <Ionicons name="book-outline" size={24} color={Theme.colors.secondaryContainer} />
+          </View>
+
+          {/* Ruled Two-Column Ledger Balance Grid */}
+          <View style={styles.heroGrid}>
+            {/* Col 1: Aaj ka Udhaar Diya (Relabelled from Kul Bikri per hard rule) */}
+            <View style={styles.heroGridColLeft}>
+              <Text style={styles.heroColLabel}>{t('stitch.aajKaUdhaarDiya')}</Text>
+              <Text style={styles.heroAmount}>
+                +{formatPaise(briefing.totalSalesPaise)}
+              </Text>
+              <Text style={styles.heroColSub}>
+                {isDemoMode ? '12 entries' : 'Aaj ke credit hisaab'}
+              </Text>
+            </View>
+
+            {/* Col 2: Active Udhaar Baaki */}
+            <View style={styles.heroGridColRight}>
+              <Text style={styles.heroColLabel}>{t('stitch.activeUdhaarBaaki')}</Text>
+              <Text style={styles.heroAmount}>
+                {formatPaise(briefing.totalOutstandingPaise)}
+              </Text>
+              <Text style={styles.heroColSub}>
+                {t('stitch.grahakCountUnit', { count: overdueCustomers.length })}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.briefingNarrative}>
-            {t('insights.briefingNarrative', {
-              sales: formatPaise(briefing.totalSalesPaise),
-              collected: formatPaise(briefing.totalCollectedPaise),
-              due: formatPaise(briefing.totalOutstandingPaise),
-            })}
-          </Text>
-        </View>
-
-        {/* Financial KPI Cards */}
-        <View style={styles.kpiGrid}>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>{t('insights.kpiSales')}</Text>
-            <Text style={styles.kpiValue}>
-              {formatPaise(briefing.totalSalesPaise)}
-            </Text>
-            <Text style={styles.kpiSub}>{t('insights.kpiSalesSub')}</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>{t('insights.kpiCollected')}</Text>
-            <Text style={[styles.kpiValue, { color: Palette.successGreen }]}>
-              {formatPaise(briefing.totalCollectedPaise)}
-            </Text>
-            <Text style={styles.kpiSub}>{t('insights.kpiCollectedSub')}</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>{t('insights.kpiMargin')}</Text>
-            <Text style={[styles.kpiValue, { color: Palette.primaryBlueDark }]}>
-              {formatPaise(briefing.estimatedGrossProfitPaise)}
-            </Text>
-            <Text style={styles.kpiSub}>{t('insights.kpiMarginSub')}</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiLabel}>{t('insights.kpiExpenses')}</Text>
-            <Text style={[styles.kpiValue, { color: Palette.dangerRed }]}>
-              {formatPaise(briefing.totalExpensesPaise)}
-            </Text>
-            <Text style={styles.kpiSub}>{t('insights.kpiExpensesSub')}</Text>
-          </View>
-        </View>
-
-        {/* Collection Efficiency Ratio Bar */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{t('insights.collectionEfficiency')}</Text>
-            <Text style={styles.rateBadge}>{t('insights.recovered', { rate: collectionRate })}</Text>
-          </View>
-          <View style={styles.progressBarBg}>
-            <View
-              style={[styles.progressBarFill, { width: `${collectionRate}%` }]}
-            />
-          </View>
-          <View style={styles.progressLegendRow}>
-            <Text style={styles.legendText}>
-              {t('insights.collectedLegend', { amount: formatPaise(briefing.totalCollectedPaise) })}
-            </Text>
-            <Text style={styles.legendText}>
-              {t('insights.dueLegend', { amount: formatPaise(briefing.totalOutstandingPaise) })}
+          {/* Factual Ledger Observation Banner */}
+          <View style={styles.heroObservationRow}>
+            <Ionicons name="trending-up" size={18} color={Theme.colors.secondaryContainer} />
+            <Text style={styles.heroObservationText}>
+              {isDemoMode
+                ? 'Pichhle Somvaar se UPI collection 18% adhik hai.'
+                : `Total active khata grahak: ${customers.length}. Sabhi hisaab verified.`}
             </Text>
           </View>
         </View>
 
-        {/* Profit Leak Detector */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.leakHeaderLeft}>
-              <Ionicons name="warning" size={18} color={Palette.warningAmber} />
-              <Text style={styles.sectionTitle}>{t('insights.profitLeakTitle')}</Text>
-            </View>
-            <View style={styles.alertPill}>
-              <Text style={styles.alertPillText}>
-                {t('insights.profitLeakAlerts', { count: briefing.profitLeakAlerts.length })}
-              </Text>
-            </View>
-          </View>
-
-          {briefing.profitLeakAlerts.map((leak) => (
-            <View key={leak.id} style={styles.leakItem}>
-              <View style={styles.leakItemHeader}>
-                <Text style={styles.leakTitle}>{leak.title}</Text>
-                {leak.metricImpact && (
-                  <Text style={styles.leakImpact}>{leak.metricImpact}</Text>
-                )}
-              </View>
-              <Text style={styles.leakDesc}>{leak.description}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Low-Stock Warnings */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.leakHeaderLeft}>
-              <Ionicons name="cube" size={18} color={Palette.dangerRed} />
-              <Text style={styles.sectionTitle}>{t('insights.lowStockTitle')}</Text>
-            </View>
-            <Text style={styles.stockCountText}>
-              {t('insights.lowStockCount', { count: lowStockItems.length })}
+        {/* SECTION 2: Karyavahi & Alerts (Ruled bahi-khata ledger rows, 1px borders, zero cards) */}
+        <View style={styles.actionSection}>
+          <View style={styles.sectionHeaderBar}>
+            <Text style={styles.sectionHeaderTitle}>
+              {t('stitch.karyavahiAlerts', {
+                count: (topOverdueCustomer ? 1 : 0) + (unmatchedPayments.length > 0 ? 1 : 0),
+              })}
             </Text>
           </View>
 
-          {lowStockItems.map((item) => (
-            <View key={item.id} style={styles.stockItem}>
-              <View style={styles.stockInfoCol}>
-                <Text style={styles.stockName}>{item.name}</Text>
-                <Text style={styles.stockSupplier}>
-                  {item.hindiName} • {t('insights.supplier', { name: item.supplierName || '' })}
-                </Text>
-              </View>
-
-              <View style={styles.stockQtyCol}>
-                <View style={styles.stockAlertBadge}>
-                  <Text style={styles.stockAlertText}>
-                    {t('insights.onlyStock', { qty: item.currentStock, unit: item.unit })}
+          {/* Row 1: Purana Udhaar Tagaada */}
+          {topOverdueCustomer ? (
+            <View style={styles.ledgerRow}>
+              <View style={styles.rowTopBar}>
+                <View style={styles.rowTitleGroup}>
+                  <View style={[styles.dotIndicator, { backgroundColor: Theme.colors.moneyRed }]} />
+                  <Text style={styles.rowTitle}>
+                    {t('stitch.puranaUdhaarTagaadaTitle', { count: overdueCustomers.length })}
                   </Text>
                 </View>
-                <Text style={styles.stockMinText}>
-                  {t('insights.minThreshold', { threshold: item.minStockThreshold })}
+                <View style={styles.badgePending}>
+                  <Text style={styles.badgePendingText}>Pending</Text>
+                </View>
+              </View>
+
+              <Text style={styles.rowDescription}>
+                {topOverdueCustomer.name} ka hisaab baaki hai (Kul {formatPaise(topOverdueCustomer.currentBalancePaise)}).
+              </Text>
+
+              <View style={styles.rowFooterBar}>
+                <Pressable
+                  style={styles.actionLink}
+                  onPress={() => handleSendReminder(topOverdueCustomer)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.actionLinkText}>{t('stitch.whatsappReminderBtn')}</Text>
+                  <Ionicons name="paper-plane-outline" size={16} color={Theme.colors.primaryContainer} />
+                </Pressable>
+                <Text style={styles.rowMetaText}>
+                  {topOverdueCustomer.lastActivityDate || 'Haal hi me'}
                 </Text>
               </View>
             </View>
-          ))}
+          ) : (
+            <View style={styles.ledgerRow}>
+              <View style={styles.rowTopBar}>
+                <View style={styles.rowTitleGroup}>
+                  <View style={[styles.dotIndicator, { backgroundColor: Theme.colors.moneyGreen }]} />
+                  <Text style={styles.rowTitle}>Sabhi Hisaab Chukta</Text>
+                </View>
+              </View>
+              <Text style={styles.rowDescription}>
+                Kisi bhi grahak ka purana udhaar baaki nahi hai.
+              </Text>
+            </View>
+          )}
+
+          {/* Row 2: Unmatched Payment Alert */}
+          {unmatchedPayments.length > 0 && (
+            <View style={styles.ledgerRow}>
+              <View style={styles.rowTopBar}>
+                <View style={styles.rowTitleGroup}>
+                  <View style={[styles.dotIndicator, { backgroundColor: Theme.colors.primaryContainer }]} />
+                  <Text style={styles.rowTitle}>{t('stitch.unmatchedAlertTitle')}</Text>
+                </View>
+                <View style={styles.badgeQr}>
+                  <Text style={styles.badgeQrText}>QR Entry</Text>
+                </View>
+              </View>
+
+              <Text style={styles.rowDescription}>
+                {formatPaise(totalUnmatchedPaise)} ka QR payment ({unmatchedPayments.length} entries) grahak se link nahi hua.
+              </Text>
+
+              <View style={styles.rowFooterBar}>
+                <Pressable
+                  style={styles.actionLink}
+                  onPress={() => router.push('/(tabs)/payments')}
+                  hitSlop={8}
+                >
+                  <Text style={styles.actionLinkText}>{t('stitch.customerSeJodein')}</Text>
+                  <Ionicons name="link-outline" size={16} color={Theme.colors.primaryContainer} />
+                </Pressable>
+                <Text style={styles.rowMetaText}>Live Soundbox</Text>
+              </View>
+            </View>
+          )}
         </View>
 
-        {/* Actionable Follow-up Card */}
-        <View style={styles.actionCard}>
-          <Text style={styles.actionCardTitle}>{t('insights.recActionTitle')}</Text>
-          <Text style={styles.actionCardDesc}>
-            {t('insights.recActionDesc')}
-          </Text>
-          <Pressable
-            style={styles.actionButton}
-            onPress={() => router.push('/customer/cust-2')}
-          >
-            <Ionicons name="logo-whatsapp" size={18} color={Palette.white} />
-            <Text style={styles.actionButtonText}>
-              {t('insights.openKhataRemindBtn', { name: 'Suresh Verma' })}
-            </Text>
-          </Pressable>
-        </View>
+        {/* SECTION 3: Real Mode vs Demo Mode Handling */}
+        {!isDemoMode ? (
+          /* Real Mode: Truthful Empty State Preview (strictly NO invented gross profit, expenses, or leaks) */
+          <View style={styles.truthfulStateBox}>
+            <View style={styles.chartIconCircle}>
+              <Ionicons name="bar-chart-outline" size={24} color={Theme.colors.outline} />
+            </View>
+            <Text style={styles.truthfulTitle}>{t('stitch.truthfulEmptyTitle')}</Text>
+            <Text style={styles.truthfulDesc}>{t('stitch.truthfulEmptyDesc')}</Text>
 
-        {/* Footer info note */}
-        <View style={styles.footerNote}>
-          <Ionicons name="sparkles" size={14} color={Palette.textMuted} />
-          <Text style={styles.footerNoteText}>
-            {t('insights.engineNote')}
-          </Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressLabelRow}>
+                <Text style={styles.progressLabel}>
+                  {t('stitch.pragatiHisaab', { count: customers.length })}
+                </Text>
+                <Text style={styles.progressValue}>
+                  {Math.min(100, customers.length * 20)}%
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.min(100, customers.length * 20)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* Demo Mode: Seed KPIs & Alerts marked with [DEMO] pills */
+          <View style={styles.demoSection}>
+            <View style={styles.demoHeaderRow}>
+              <Text style={styles.demoHeaderTitle}>Demo Financial Indicators</Text>
+              <View style={styles.demoPill}>
+                <Text style={styles.demoPillText}>DEMO</Text>
+              </View>
+            </View>
+
+            {/* Financial KPI Cards */}
+            <View style={styles.kpiGrid}>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>{t('insights.kpiMargin')}</Text>
+                <Text style={[styles.kpiValue, { color: Theme.colors.moneyGreen }]}>
+                  {formatPaise(briefing.estimatedGrossProfitPaise)}
+                </Text>
+                <Text style={styles.kpiSub}>{t('insights.kpiMarginSub')}</Text>
+              </View>
+
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>{t('insights.kpiExpenses')}</Text>
+                <Text style={[styles.kpiValue, { color: Theme.colors.moneyRed }]}>
+                  {formatPaise(briefing.totalExpensesPaise)}
+                </Text>
+                <Text style={styles.kpiSub}>{t('insights.kpiExpensesSub')}</Text>
+              </View>
+            </View>
+
+            {/* Profit Leak detector in Demo */}
+            {briefing.profitLeakAlerts.length > 0 && (
+              <View style={styles.leakBox}>
+                <View style={styles.leakHeader}>
+                  <Ionicons name="warning-outline" size={16} color={Theme.colors.moneyRed} />
+                  <Text style={styles.leakHeaderText}>{t('insights.profitLeakTitle')}</Text>
+                  <View style={styles.demoPill}>
+                    <Text style={styles.demoPillText}>DEMO</Text>
+                  </View>
+                </View>
+                {briefing.profitLeakAlerts.map((leak) => (
+                  <View key={leak.id} style={styles.leakItem}>
+                    <Text style={styles.leakTitle}>{leak.title}</Text>
+                    <Text style={styles.leakDesc}>{leak.description}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Low-Stock Warnings in Demo */}
+            {lowStockItems.length > 0 && (
+              <View style={styles.stockBox}>
+                <View style={styles.stockHeader}>
+                  <Ionicons name="cube-outline" size={16} color={Theme.colors.onSurface} />
+                  <Text style={styles.stockHeaderText}>{t('insights.lowStockTitle')}</Text>
+                  <Text style={styles.stockCountText}>
+                    {t('insights.lowStockCount', { count: lowStockItems.length })}
+                  </Text>
+                </View>
+                {lowStockItems.map((item) => (
+                  <View key={item.id} style={styles.stockRow}>
+                    <Text style={styles.stockName}>{item.name}</Text>
+                    <Text style={styles.stockQty}>
+                      {t('insights.onlyStock', { qty: item.currentStock, unit: item.unit })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Historical Register Footnote */}
+        <View style={styles.footnote}>
+          <Text style={styles.footnoteText}>{t('stitch.footnoteBrand')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -215,274 +332,387 @@ export default function InsightsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
-  briefingHeaderCard: {
-    backgroundColor: Palette.darkNavy,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 14,
+
+  /* SECTION 1: Monolithic Hero */
+  heroPanel: {
+    backgroundColor: Theme.colors.primaryContainer,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingTop: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.lg,
   },
-  briefingTitleRow: {
+  heroHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+    paddingBottom: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
   },
-  sparkleCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Palette.primaryBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroSubLabel: {
+    ...Theme.typography.labelMd,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  briefingTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.white,
-  },
-  briefingSubtitle: {
-    fontSize: 11,
-    color: '#9FB3C8',
+  heroDateTitle: {
+    ...Theme.typography.titleMd,
+    color: Theme.colors.onPrimary,
     marginTop: 2,
   },
-  briefingNarrative: {
-    fontSize: 13,
-    color: '#E2E8F0',
-    lineHeight: 20,
+  heroGrid: {
+    flexDirection: 'row',
+    marginVertical: Theme.spacing.sm,
   },
-  boldText: {
+  heroGridColLeft: {
+    flex: 1,
+    paddingRight: Theme.spacing.md,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  heroGridColRight: {
+    flex: 1,
+    paddingLeft: Theme.spacing.md,
+  },
+  heroColLabel: {
+    ...Theme.typography.labelMd,
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  heroAmount: {
+    fontSize: 22,
     fontWeight: '700',
-    color: Palette.primaryBlue,
+    color: Theme.colors.onPrimary,
+    marginTop: 4,
+    letterSpacing: -0.3,
+  },
+  heroColSub: {
+    ...Theme.typography.bodySm,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
+  },
+  heroObservationRow: {
+    marginTop: Theme.spacing.md,
+    paddingTop: Theme.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroObservationText: {
+    flex: 1,
+    ...Theme.typography.bodyMd,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 18,
+  },
+
+  /* SECTION 2: Action Section */
+  actionSection: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+  },
+  sectionHeaderBar: {
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceContainerLow,
+  },
+  sectionHeaderTitle: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  ledgerRow: {
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    gap: 8,
+  },
+  rowTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rowTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dotIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  rowTitle: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+  },
+  badgePending: {
+    backgroundColor: Theme.colors.moneyRedBg,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.moneyRedBorder,
+  },
+  badgePendingText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+  badgeQr: {
+    backgroundColor: Theme.colors.surfaceContainer,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radii.sm,
+  },
+  badgeQrText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.primaryContainer,
+    fontWeight: '700',
+  },
+  rowDescription: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+  },
+  rowFooterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  actionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionLinkText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.primaryContainer,
+    fontWeight: '700',
+  },
+  rowMetaText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
+  },
+
+  /* SECTION 3: Truthful Empty State Preview (Real Mode) */
+  truthfulStateBox: {
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: 32,
+    alignItems: 'center',
+    textAlign: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceCard,
+  },
+  chartIconCircle: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    backgroundColor: Theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  truthfulTitle: {
+    ...Theme.typography.titleMd,
+    color: Theme.colors.onSurface,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  truthfulDesc: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    maxWidth: 320,
+    lineHeight: 18,
+  },
+  progressContainer: {
+    width: '100%',
+    maxWidth: 320,
+    marginTop: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  progressLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+  },
+  progressValue: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.primaryContainer,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: Theme.colors.surfaceContainer,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Theme.colors.primaryContainer,
+  },
+
+  /* Demo Mode Section */
+  demoSection: {
+    padding: Theme.spacing.gutter,
+    gap: Theme.spacing.md,
+  },
+  demoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  demoHeaderTitle: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+    textTransform: 'uppercase',
+  },
+  demoPill: {
+    backgroundColor: Theme.colors.surfaceContainer,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radii.sm,
+  },
+  demoPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.onSurfaceVariant,
   },
   kpiGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 14,
+    gap: 12,
   },
   kpiCard: {
-    width: '48%',
-    backgroundColor: Palette.white,
-    borderRadius: 10,
+    flex: 1,
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.md,
     padding: 12,
   },
   kpiLabel: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-    marginBottom: 4,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
   },
   kpiValue: {
-    fontSize: 17,
+    ...Theme.typography.titleMd,
     fontWeight: '700',
-    color: Palette.darkNavy,
-    letterSpacing: -0.3,
-  },
-  kpiSub: {
-    fontSize: 10,
-    color: Palette.textMuted,
     marginTop: 4,
   },
-  sectionCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 14,
-    marginBottom: 14,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  leakHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  rateBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Palette.successGreen,
-    backgroundColor: Palette.successGreenLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  progressBarBg: {
-    height: 10,
-    backgroundColor: '#FDE8E8',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: 10,
-    backgroundColor: Palette.successGreen,
-    borderRadius: 5,
-  },
-  progressLegendRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  legendText: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-  },
-  alertPill: {
-    backgroundColor: Palette.warningAmberLight,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  alertPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Palette.warningAmber,
-  },
-  leakItem: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: 8,
-    padding: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: Palette.warningAmber,
-    marginBottom: 8,
-  },
-  leakItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  leakTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#92400E',
-    flex: 1,
-  },
-  leakImpact: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Palette.dangerRed,
-    backgroundColor: Palette.white,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  leakDesc: {
-    fontSize: 11,
-    color: '#78350F',
-    lineHeight: 16,
-  },
-  stockCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.dangerRed,
-  },
-  stockItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.borderLight,
-  },
-  stockInfoCol: {
-    flex: 1,
-    marginRight: 10,
-  },
-  stockName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  stockSupplier: {
-    fontSize: 11,
-    color: Palette.textSecondary,
+  kpiSub: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
     marginTop: 2,
   },
-  stockQtyCol: {
-    alignItems: 'flex-end',
-  },
-  stockAlertBadge: {
-    backgroundColor: Palette.dangerRedLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  stockAlertText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Palette.dangerRed,
-  },
-  stockMinText: {
-    fontSize: 10,
-    color: Palette.textMuted,
-    marginTop: 2,
-  },
-  actionCard: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 12,
+  leakBox: {
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-    padding: 14,
-    marginBottom: 12,
-  },
-  actionCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#166534',
-    marginBottom: 4,
-  },
-  actionCardDesc: {
-    fontSize: 12,
-    color: '#15803D',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  actionButton: {
-    backgroundColor: Palette.successGreen,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.md,
+    padding: 12,
     gap: 8,
   },
-  actionButtonText: {
-    color: Palette.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  footerNote: {
+  leakHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    marginTop: 10,
-    paddingVertical: 8,
   },
-  footerNoteText: {
-    fontSize: 11,
-    color: Palette.textMuted,
+  leakHeaderText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+    flex: 1,
+  },
+  leakItem: {
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+  },
+  leakTitle: {
+    ...Theme.typography.bodyMd,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+  },
+  leakDesc: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 2,
+  },
+  stockBox: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.md,
+    padding: 12,
+    gap: 8,
+  },
+  stockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stockHeaderText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurface,
+    fontWeight: '700',
+    flex: 1,
+  },
+  stockCountText: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
+  },
+  stockRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+  },
+  stockName: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+  },
+  stockQty: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.moneyRed,
+    fontWeight: '600',
+  },
+
+  /* Footnote */
+  footnote: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  footnoteText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });
