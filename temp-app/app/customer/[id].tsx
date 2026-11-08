@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,21 @@ import {
   Linking,
   Share,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { TransactionItem } from '@/components/TransactionItem';
-import { formatPaise, rupeesToPaise } from '@/utils/format';
+import { formatPaise, rupeesToPaise, formatDisplayPhone } from '@/utils/format';
+import { LedgerEntry } from '@/types';
+
+interface LedgerEntryWithBalance extends LedgerEntry {
+  runningBalancePaise: number;
+}
 
 export default function CustomerDetailScreen() {
   const router = useRouter();
@@ -53,6 +59,26 @@ export default function CustomerDetailScreen() {
   const [isUpdating, setIsUpdating] = useState(false);
   const isUpdatingRef = useRef(false);
 
+  // Compute running balance chronologically (oldest to newest) strictly in integer paise
+  const transactionsWithRunningBalance = useMemo<LedgerEntryWithBalance[]>(() => {
+    const chronologicallyOrdered = [...transactions].reverse();
+    let cumulativePaise = 0;
+
+    const withBalance = chronologicallyOrdered.map((entry) => {
+      if (entry.type === 'CREDIT_SALE') {
+        cumulativePaise += entry.amountPaise;
+      } else {
+        cumulativePaise = Math.max(0, cumulativePaise - entry.amountPaise);
+      }
+      return {
+        ...entry,
+        runningBalancePaise: cumulativePaise,
+      };
+    });
+
+    return withBalance.reverse();
+  }, [transactions]);
+
   if (!customer) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -67,11 +93,16 @@ export default function CustomerDetailScreen() {
   }
 
   const hasDue = customer.currentBalancePaise > 0;
+  const isSettled = customer.currentBalancePaise === 0;
 
   const handleOpenTransactionModal = (type: 'CREDIT_SALE' | 'REPAYMENT') => {
     setModalType(type);
     setAmountRupees('');
-    setDescription(type === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder'));
+    setDescription(
+      type === 'CREDIT_SALE'
+        ? t('home.descriptionCreditPlaceholder')
+        : t('home.descriptionRepayPlaceholder')
+    );
   };
 
   const handleSaveTransaction = () => {
@@ -83,9 +114,19 @@ export default function CustomerDetailScreen() {
 
     const amountPaise = rupeesToPaise(rupees);
     if (modalType === 'CREDIT_SALE') {
-      recordCreditSale(customer.id, amountPaise, description || t('card.creditSaleType'), 'MANUAL');
+      recordCreditSale(
+        customer.id,
+        amountPaise,
+        description || t('card.creditSaleType'),
+        'MANUAL'
+      );
     } else {
-      recordRepayment(customer.id, amountPaise, description || t('card.repaymentType'), 'MANUAL');
+      recordRepayment(
+        customer.id,
+        amountPaise,
+        description || t('card.repaymentType'),
+        'MANUAL'
+      );
     }
 
     setModalType(null);
@@ -117,7 +158,7 @@ export default function CustomerDetailScreen() {
         t('customerDetail.reminderSuccessMsg')
       );
     } catch (error) {
-      console.log('Error sharing:', error);
+      // Clean share failure handling without sensitive logging
     }
   };
 
@@ -171,33 +212,39 @@ export default function CustomerDetailScreen() {
     }
   };
 
+  const maskedPhone = formatDisplayPhone(customer.phone);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color={Palette.darkNavy} />
+      {/* Docked 56dp TopAppBar matching Stitch */}
+      <View style={styles.topAppBar}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          hitSlop={10}
+          accessibilityLabel={t('common.back')}
+        >
+          <Ionicons name="arrow-back" size={22} color={Theme.colors.onSurface} />
         </Pressable>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {customer.name}
-        </Text>
+
+        <View style={styles.headerTitleCol}>
+          <Text style={styles.headerCustomerName} numberOfLines={1}>
+            {customer.name}
+          </Text>
+          {maskedPhone ? (
+            <Text style={styles.headerCustomerPhone}>{maskedPhone}</Text>
+          ) : null}
+        </View>
+
         <View style={styles.headerRightActions}>
           <Pressable
-            style={styles.editHeaderBtn}
+            style={styles.headerActionBtn}
             onPress={handleOpenEditModal}
+            hitSlop={10}
             accessibilityLabel={t('customerDetail.editCustomerBtn')}
           >
-            <Ionicons name="pencil" size={17} color={Palette.darkNavy} />
+            <Ionicons name="pencil" size={18} color={Theme.colors.onSurface} />
           </Pressable>
-          {customer.phone && (
-            <Pressable
-              style={styles.callButton}
-              onPress={() => Linking.openURL(`tel:${customer.phone}`)}
-              accessibilityLabel={t('customerDetail.actionCall')}
-            >
-              <Ionicons name="call" size={17} color={Palette.primaryBlue} />
-            </Pressable>
-          )}
         </View>
       </View>
 
@@ -206,152 +253,199 @@ export default function CustomerDetailScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Customer Profile & Info Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileTopRow}>
-            <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>
-                {(customer.name || '')
-                  .trim()
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase() || 'C'}
-              </Text>
-            </View>
-            <View style={styles.profileInfoCol}>
-              <Text style={styles.profileName} numberOfLines={1}>
-                {customer.name}
-              </Text>
-              <View style={styles.profilePhoneRow}>
+        {/* Monolithic Customer Masthead */}
+        <View style={styles.masthead}>
+          <Text style={styles.mastheadLabel}>
+            {hasDue
+              ? t('stitch.dueUdhaarLabel')
+              : isSettled
+              ? t('stitch.hisaabBarabar')
+              : t('stitch.advanceJama')}
+          </Text>
+
+          <Text
+            style={[
+              styles.mastheadAmount,
+              hasDue ? styles.amountDue : styles.amountSettled,
+            ]}
+          >
+            {formatPaise(Math.abs(customer.currentBalancePaise))}
+          </Text>
+
+          {/* Quick Contact Action Pills */}
+          <View style={styles.contactActionsRow}>
+            {customer.phone ? (
+              <>
+                <Pressable
+                  style={styles.contactPill}
+                  onPress={() => Linking.openURL(`tel:${customer.phone}`)}
+                  accessibilityLabel={t('customerDetail.actionCall')}
+                >
+                  <Ionicons name="call" size={15} color={Theme.colors.onPrimary} />
+                  <Text style={styles.contactPillText}>
+                    {t('customerDetail.actionCall')}
+                  </Text>
+                </Pressable>
+
+                {hasDue && (
+                  <Pressable
+                    style={[styles.contactPill, styles.whatsappPill]}
+                    onPress={handleOpenReminder}
+                    accessibilityLabel={t('customerDetail.remindBtn')}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color={Theme.colors.white} />
+                    <Text style={styles.contactPillText}>
+                      {t('customerDetail.remindBtn')}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <Pressable
+                style={styles.contactPillSecondary}
+                onPress={handleOpenEditModal}
+              >
                 <Ionicons
                   name="call-outline"
-                  size={13}
-                  color={Palette.textSecondary}
+                  size={14}
+                  color={Theme.colors.onSurfaceVariant}
                 />
-                <Text style={styles.profilePhone}>
-                  {customer.phone || t('customerDetail.noPhone')}
+                <Text style={styles.contactPillTextSecondary}>
+                  {t('customerDetail.noPhone')} · {t('customerDetail.editCustomerBtn')}
                 </Text>
-              </View>
-              {customer.createdAt && (
-                <Text style={styles.profileCreated}>
-                  {t('customerDetail.memberSince', {
-                    date: new Date(customer.createdAt).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    }),
-                  })}
-                </Text>
-              )}
-            </View>
-            <Pressable
-              style={styles.editProfileBtn}
-              onPress={handleOpenEditModal}
-              accessibilityLabel={t('customerDetail.editCustomerBtn')}
-            >
-              <Ionicons name="pencil" size={13} color={Palette.primaryBlue} />
-              <Text style={styles.editProfileBtnText}>
-                {t('customerDetail.editCustomerBtn')}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Customer Balance Card */}
-        <View style={styles.balanceCard}>
-          <View style={styles.balanceTopRow}>
-            <View>
-              <Text style={styles.balanceLabel}>
-                {hasDue ? t('customerDetail.totalDue') : t('customerDetail.settled')}
-              </Text>
-              <Text
-                style={[
-                  styles.balanceAmount,
-                  { color: hasDue ? Palette.dangerRed : Palette.successGreen },
-                ]}
-              >
-                {formatPaise(customer.currentBalancePaise)}
-              </Text>
-            </View>
-
-            {hasDue && (
-              <Pressable
-                style={styles.reminderButton}
-                onPress={handleOpenReminder}
-              >
-                <Ionicons name="logo-whatsapp" size={16} color={Palette.white} />
-                <Text style={styles.reminderButtonText}>{t('customerDetail.remindBtn')}</Text>
               </Pressable>
             )}
           </View>
+        </View>
 
+        {/* Aggregate Stats Bar */}
+        <View style={styles.statsBar}>
+          <View style={styles.statsCol}>
+            <Text style={styles.statsLabel}>{t('customerDetail.totalCredit')}</Text>
+            <Text style={styles.statsCreditValue}>
+              {formatPaise(customer.totalCreditPaise)}
+            </Text>
+          </View>
           <View style={styles.statsDivider} />
-
-          <View style={styles.totalsRow}>
-            <View style={styles.totalCol}>
-              <Text style={styles.totalSub}>{t('customerDetail.totalCredit')}</Text>
-              <Text style={styles.totalCredit}>
-                {formatPaise(customer.totalCreditPaise)}
-              </Text>
-            </View>
-            <View style={styles.verticalSep} />
-            <View style={styles.totalCol}>
-              <Text style={styles.totalSub}>{t('customerDetail.totalRepaid')}</Text>
-              <Text style={styles.totalRepayment}>
-                {formatPaise(customer.totalRepaymentPaise)}
-              </Text>
-            </View>
+          <View style={styles.statsCol}>
+            <Text style={styles.statsLabel}>{t('customerDetail.totalRepaid')}</Text>
+            <Text style={styles.statsRepaidValue}>
+              {formatPaise(customer.totalRepaymentPaise)}
+            </Text>
           </View>
         </View>
 
-        {/* Quick Transaction Action Buttons */}
-        <View style={styles.actionsRow}>
-          <Pressable
-            style={[styles.actionBtn, styles.creditBtn]}
-            onPress={() => handleOpenTransactionModal('CREDIT_SALE')}
-          >
-            <Ionicons name="arrow-up" size={18} color={Palette.white} />
-            <Text style={styles.actionBtnText}>{t('customerDetail.actionGiveCredit')}</Text>
-          </Pressable>
+        {/* Ledger Transaction History Section */}
+        <View style={styles.historySection}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyHeaderTitle}>
+              {t('customerDetail.ledgerCount', { count: transactions.length })}
+            </Text>
+            <Text style={styles.historyHeaderSub}>
+              {t('customerDetail.ledgerPaiseNote')}
+            </Text>
+          </View>
 
-          <Pressable
-            style={[styles.actionBtn, styles.repaymentBtn]}
-            onPress={() => handleOpenTransactionModal('REPAYMENT')}
-          >
-            <Ionicons name="arrow-down" size={18} color={Palette.white} />
-            <Text style={styles.actionBtnText}>{t('customerDetail.actionRepay')}</Text>
-          </Pressable>
-        </View>
+          <View style={styles.ledgerCard}>
+            {transactionsWithRunningBalance.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons
+                  name="receipt-outline"
+                  size={42}
+                  color={Theme.colors.outline}
+                />
+                <Text style={styles.emptyTitle}>
+                  {t('customerDetail.emptyLedger')}
+                </Text>
+              </View>
+            ) : (
+              transactionsWithRunningBalance.map((item, idx) => {
+                const isCredit = item.type === 'CREDIT_SALE';
+                const isLast = idx === transactionsWithRunningBalance.length - 1;
 
-        {/* Transaction History Section */}
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>
-            {t('customerDetail.ledgerCount', { count: transactions.length })}
-          </Text>
-          <Text style={styles.historyNote}>{t('customerDetail.ledgerPaiseNote')}</Text>
-        </View>
+                return (
+                  <View
+                    key={item.id}
+                    style={[styles.txRow, !isLast && styles.txRowBorder]}
+                  >
+                    {/* Left: Tx Info */}
+                    <View style={styles.txLeftCol}>
+                      <View style={styles.txBadgeRow}>
+                        <View
+                          style={[
+                            styles.txBadge,
+                            isCredit ? styles.txBadgeCredit : styles.txBadgeRepay,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.txBadgeText,
+                              isCredit
+                                ? styles.txBadgeTextCredit
+                                : styles.txBadgeTextRepay,
+                            ]}
+                          >
+                            {isCredit
+                              ? t('card.creditSaleType')
+                              : t('card.repaymentType')}
+                          </Text>
+                        </View>
+                        <Text style={styles.txDate}>{item.createdAt}</Text>
+                      </View>
 
-        <View style={styles.historyCard}>
-          {transactions.map((entry) => (
-            <TransactionItem
-              key={entry.id}
-              entry={entry}
-              showCustomerName={false}
-            />
-          ))}
+                      {item.description ? (
+                        <Text style={styles.txDesc} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      ) : null}
+                    </View>
 
-          {transactions.length === 0 && (
-            <View style={styles.emptyHistory}>
-              <Text style={styles.emptyHistoryText}>
-                {t('customerDetail.emptyLedger')}
-              </Text>
-            </View>
-          )}
+                    {/* Right: Amounts */}
+                    <View style={styles.txRightCol}>
+                      <Text
+                        style={[
+                          styles.txAmount,
+                          isCredit ? styles.txAmountCredit : styles.txAmountRepay,
+                        ]}
+                      >
+                        {isCredit ? '-' : '+'} {formatPaise(item.amountPaise)}
+                      </Text>
+                      <Text style={styles.txRunningBalance}>
+                        Baaki: {formatPaise(item.runningBalancePaise)}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
         </View>
       </ScrollView>
+
+      {/* Docked Ruled Bottom Action Bar */}
+      <View style={styles.bottomDockedBar}>
+        <Pressable
+          style={[styles.dockedActionBtn, styles.dockedCreditBtn]}
+          onPress={() => handleOpenTransactionModal('CREDIT_SALE')}
+          accessibilityLabel={t('customerDetail.actionGiveCredit')}
+        >
+          <Ionicons name="remove-circle-outline" size={20} color={Theme.colors.moneyRed} />
+          <Text style={styles.dockedCreditText}>
+            {t('customerDetail.actionGiveCredit')}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.dockedActionBtn, styles.dockedRepayBtn]}
+          onPress={() => handleOpenTransactionModal('REPAYMENT')}
+          accessibilityLabel={t('customerDetail.actionRepay')}
+        >
+          <Ionicons name="add-circle-outline" size={20} color={Theme.colors.moneyGreen} />
+          <Text style={styles.dockedRepayText}>
+            {t('customerDetail.actionRepay')}
+          </Text>
+        </Pressable>
+      </View>
 
       {/* Add Transaction Modal */}
       <Modal
@@ -360,7 +454,10 @@ export default function CustomerDetailScreen() {
         animationType="slide"
         onRequestClose={() => setModalType(null)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -369,7 +466,7 @@ export default function CustomerDetailScreen() {
                   : t('customerDetail.modalRepayTitle', { name: customer.name })}
               </Text>
               <Pressable onPress={() => setModalType(null)} hitSlop={10}>
-                <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
+                <Ionicons name="close-circle" size={24} color={Theme.colors.onSurfaceVariant} />
               </Pressable>
             </View>
 
@@ -380,7 +477,7 @@ export default function CustomerDetailScreen() {
                 style={styles.amountInput}
                 keyboardType="numeric"
                 placeholder={t('home.amountPlaceholder')}
-                placeholderTextColor={Palette.textMuted}
+                placeholderTextColor={Theme.colors.outline}
                 value={amountRupees}
                 onChangeText={setAmountRupees}
                 autoFocus
@@ -390,8 +487,12 @@ export default function CustomerDetailScreen() {
             <Text style={styles.inputLabel}>{t('home.description')}</Text>
             <TextInput
               style={styles.textInput}
-              placeholder={modalType === 'CREDIT_SALE' ? t('home.descriptionCreditPlaceholder') : t('home.descriptionRepayPlaceholder')}
-              placeholderTextColor={Palette.textMuted}
+              placeholder={
+                modalType === 'CREDIT_SALE'
+                  ? t('home.descriptionCreditPlaceholder')
+                  : t('home.descriptionRepayPlaceholder')
+              }
+              placeholderTextColor={Theme.colors.outline}
               value={description}
               onChangeText={setDescription}
             />
@@ -402,8 +503,8 @@ export default function CustomerDetailScreen() {
                 {
                   backgroundColor:
                     modalType === 'CREDIT_SALE'
-                      ? Palette.dangerRed
-                      : Palette.successGreen,
+                      ? Theme.colors.moneyRed
+                      : Theme.colors.moneyGreen,
                 },
               ]}
               onPress={handleSaveTransaction}
@@ -415,7 +516,7 @@ export default function CustomerDetailScreen() {
               </Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* WhatsApp Reminder Modal */}
@@ -425,15 +526,20 @@ export default function CustomerDetailScreen() {
         animationType="slide"
         onRequestClose={() => setReminderModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={styles.reminderHeaderRow}>
-                <Ionicons name="logo-whatsapp" size={22} color={Palette.successGreen} />
-                <Text style={styles.modalTitle}>{t('customerDetail.reminderModalTitle')}</Text>
+                <Ionicons name="logo-whatsapp" size={22} color={Theme.colors.moneyGreen} />
+                <Text style={styles.modalTitle}>
+                  {t('customerDetail.reminderModalTitle')}
+                </Text>
               </View>
               <Pressable onPress={() => setReminderModalVisible(false)} hitSlop={10}>
-                <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
+                <Ionicons name="close-circle" size={24} color={Theme.colors.onSurfaceVariant} />
               </Pressable>
             </View>
 
@@ -453,20 +559,24 @@ export default function CustomerDetailScreen() {
                 style={styles.shareFallbackBtn}
                 onPress={handleSendViaShare}
               >
-                <Ionicons name="share-social" size={18} color={Palette.darkNavy} />
-                <Text style={styles.shareFallbackText}>{t('customerDetail.shareFallbackBtn')}</Text>
+                <Ionicons name="share-social" size={18} color={Theme.colors.primary} />
+                <Text style={styles.shareFallbackText}>
+                  {t('customerDetail.shareFallbackBtn')}
+                </Text>
               </Pressable>
 
               <Pressable
                 style={styles.whatsappSendBtn}
                 onPress={handleSendViaWhatsApp}
               >
-                <Ionicons name="logo-whatsapp" size={18} color={Palette.white} />
-                <Text style={styles.whatsappSendText}>{t('customerDetail.whatsappSendBtn')}</Text>
+                <Ionicons name="logo-whatsapp" size={18} color={Theme.colors.white} />
+                <Text style={styles.whatsappSendText}>
+                  {t('customerDetail.whatsappSendBtn')}
+                </Text>
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Edit Customer Profile Modal */}
@@ -478,7 +588,10 @@ export default function CustomerDetailScreen() {
           if (!isUpdating) setEditModalVisible(false);
         }}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -491,7 +604,7 @@ export default function CustomerDetailScreen() {
                 hitSlop={10}
                 disabled={isUpdating}
               >
-                <Ionicons name="close-circle" size={24} color={Palette.textSecondary} />
+                <Ionicons name="close-circle" size={24} color={Theme.colors.onSurfaceVariant} />
               </Pressable>
             </View>
 
@@ -499,7 +612,7 @@ export default function CustomerDetailScreen() {
             <TextInput
               style={styles.textInput}
               placeholder={t('customerNew.namePlaceholder')}
-              placeholderTextColor={Palette.textMuted}
+              placeholderTextColor={Theme.colors.outline}
               value={editName}
               onChangeText={setEditName}
               editable={!isUpdating}
@@ -511,7 +624,7 @@ export default function CustomerDetailScreen() {
               style={styles.textInput}
               keyboardType="phone-pad"
               placeholder={t('customerNew.phonePlaceholder')}
-              placeholderTextColor={Palette.textMuted}
+              placeholderTextColor={Theme.colors.outline}
               value={editPhone}
               onChangeText={setEditPhone}
               editable={!isUpdating}
@@ -538,9 +651,9 @@ export default function CustomerDetailScreen() {
                 disabled={isUpdating}
               >
                 {isUpdating ? (
-                  <ActivityIndicator size="small" color={Palette.white} />
+                  <ActivityIndicator size="small" color={Theme.colors.white} />
                 ) : (
-                  <Ionicons name="checkmark-circle" size={18} color={Palette.white} />
+                  <Ionicons name="checkmark-circle" size={18} color={Theme.colors.white} />
                 )}
                 <Text style={styles.saveEditBtnText}>
                   {isUpdating
@@ -550,7 +663,7 @@ export default function CustomerDetailScreen() {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -559,437 +672,489 @@ export default function CustomerDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: Palette.background,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  header: {
-    backgroundColor: Palette.white,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  callButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Palette.primaryBlueLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  balanceCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 16,
-    marginBottom: 14,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  balanceTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  balanceLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.textSecondary,
-    marginBottom: 4,
-  },
-  balanceAmount: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  reminderButton: {
-    backgroundColor: Palette.successGreen,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  reminderButtonText: {
-    color: Palette.white,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  statsDivider: {
-    height: 1,
-    backgroundColor: Palette.borderLight,
-    marginVertical: 14,
-  },
-  totalsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  totalCol: {
-    flex: 1,
-  },
-  verticalSep: {
-    width: 1,
-    backgroundColor: Palette.borderLight,
-    marginHorizontal: 12,
-  },
-  totalSub: {
-    fontSize: 11,
-    color: Palette.textSecondary,
-    marginBottom: 2,
-  },
-  totalCredit: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.dangerRed,
-  },
-  totalRepayment: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.successGreen,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  actionBtn: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  creditBtn: {
-    backgroundColor: Palette.dangerRed,
-  },
-  repaymentBtn: {
-    backgroundColor: Palette.successGreen,
-  },
-  actionBtnText: {
-    color: Palette.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  historyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  historyNote: {
-    fontSize: 11,
-    color: Palette.textMuted,
-  },
-  historyCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    overflow: 'hidden',
-  },
-  emptyHistory: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyHistoryText: {
-    fontSize: 13,
-    color: Palette.textSecondary,
+    backgroundColor: Theme.colors.surface,
   },
   notFoundContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: Theme.spacing.lg,
   },
   notFoundText: {
-    fontSize: 16,
-    color: Palette.textSecondary,
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onSurfaceVariant,
     marginBottom: 16,
   },
   backBtn: {
-    backgroundColor: Palette.primaryBlue,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.primary,
+    borderRadius: Theme.radii.sm,
   },
   backBtnText: {
-    color: Palette.white,
-    fontSize: 14,
-    fontWeight: '600',
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onPrimary,
+    fontWeight: '700',
   },
+
+  /* TopAppBar */
+  topAppBar: {
+    height: Theme.layout.topBarHeight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.gutter,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+  },
+  backButton: {
+    padding: Theme.spacing.xs,
+    marginRight: Theme.spacing.sm,
+  },
+  headerTitleCol: {
+    flex: 1,
+  },
+  headerCustomerName: {
+    ...Theme.typography.titleMd,
+    color: Theme.colors.primary,
+  },
+  headerCustomerPhone: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerActionBtn: {
+    padding: Theme.spacing.xs,
+  },
+
+  /* Content */
+  container: {
+    flex: 1,
+    backgroundColor: Theme.colors.surface,
+  },
+  contentContainer: {
+    paddingBottom: 80,
+  },
+
+  /* Masthead Hero */
+  masthead: {
+    backgroundColor: Theme.colors.primaryContainer,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingTop: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.lg,
+    alignItems: 'center',
+  },
+  mastheadLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.surfaceContainerHigh,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  mastheadAmount: {
+    ...Theme.typography.headlineHero,
+    marginTop: 4,
+  },
+  amountDue: {
+    color: Theme.colors.white,
+  },
+  amountSettled: {
+    color: Theme.colors.moneyGreenBorder,
+  },
+
+  /* Contact Action Pills */
+  contactActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: Theme.spacing.md,
+  },
+  contactPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Theme.radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  whatsappPill: {
+    backgroundColor: '#1E8E3E',
+    borderColor: '#1E8E3E',
+  },
+  contactPillText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.white,
+    fontWeight: '700',
+  },
+  contactPillSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Theme.colors.surfaceCard,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Theme.radii.full,
+  },
+  contactPillTextSecondary: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+  },
+
+  /* Stats Bar */
+  statsBar: {
+    flexDirection: 'row',
+    backgroundColor: Theme.colors.surfaceCard,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    paddingVertical: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.gutter,
+  },
+  statsCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statsDivider: {
+    width: 1,
+    backgroundColor: Theme.colors.hairline,
+  },
+  statsLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    marginBottom: 4,
+  },
+  statsCreditValue: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+  statsRepaidValue: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.moneyGreen,
+    fontWeight: '700',
+  },
+
+  /* History Section */
+  historySection: {
+    marginTop: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.gutter,
+  },
+  historyHeader: {
+    marginBottom: Theme.spacing.sm,
+  },
+  historyHeaderTitle: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  historyHeaderSub: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
+    marginTop: 2,
+  },
+  ledgerCard: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    overflow: 'hidden',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 36,
+    gap: 10,
+  },
+  emptyTitle: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+  },
+
+  /* Transaction Row */
+  txRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: Theme.spacing.md,
+    backgroundColor: Theme.colors.surfaceCard,
+  },
+  txRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+  },
+  txLeftCol: {
+    flex: 1,
+    marginRight: Theme.spacing.md,
+  },
+  txBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  txBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+  },
+  txBadgeCredit: {
+    backgroundColor: Theme.colors.moneyRedBg,
+    borderColor: Theme.colors.moneyRedBorder,
+  },
+  txBadgeRepay: {
+    backgroundColor: Theme.colors.moneyGreenBg,
+    borderColor: Theme.colors.moneyGreenBorder,
+  },
+  txBadgeText: {
+    ...Theme.typography.labelMd,
+    fontSize: 10,
+  },
+  txBadgeTextCredit: {
+    color: Theme.colors.moneyRed,
+  },
+  txBadgeTextRepay: {
+    color: Theme.colors.moneyGreen,
+  },
+  txDate: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
+  },
+  txDesc: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+  },
+  txRightCol: {
+    alignItems: 'flex-end',
+  },
+  txAmount: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '700',
+  },
+  txAmountCredit: {
+    color: Theme.colors.moneyRed,
+  },
+  txAmountRepay: {
+    color: Theme.colors.moneyGreen,
+  },
+  txRunningBalance: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 2,
+  },
+
+  /* Bottom Docked Action Bar */
+  bottomDockedBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 64,
+    backgroundColor: Theme.colors.surfaceCard,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+    flexDirection: 'row',
+    paddingHorizontal: Theme.spacing.gutter,
+    alignItems: 'center',
+    gap: Theme.spacing.md,
+  },
+  dockedActionBtn: {
+    flex: 1,
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+    gap: 6,
+  },
+  dockedCreditBtn: {
+    backgroundColor: Theme.colors.moneyRedBg,
+    borderColor: Theme.colors.moneyRedBorder,
+  },
+  dockedRepayBtn: {
+    backgroundColor: Theme.colors.moneyGreenBg,
+    borderColor: Theme.colors.moneyGreenBorder,
+  },
+  dockedCreditText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+  dockedRepayText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyGreen,
+    fontWeight: '700',
+  },
+
+  /* Modals */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: Theme.colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Palette.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 32,
+    backgroundColor: Theme.colors.surfaceCard,
+    borderTopLeftRadius: Theme.radii.md,
+    borderTopRightRadius: Theme.radii.md,
+    padding: Theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: Theme.spacing.md,
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+    ...Theme.typography.titleMd,
+    color: Theme.colors.primary,
   },
   inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Palette.darkNavy,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurface,
     marginBottom: 6,
-    marginTop: 8,
+    marginTop: 10,
   },
   amountInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.background,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.surfaceContainerLow,
     borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    marginBottom: 10,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    paddingHorizontal: Theme.spacing.md,
+    height: 52,
+    gap: 8,
   },
   currencySymbol: {
     fontSize: 22,
     fontWeight: '700',
-    color: Palette.darkNavy,
-    marginRight: 6,
+    color: Theme.colors.primary,
   },
   amountInput: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: Palette.darkNavy,
-    paddingVertical: 10,
+    color: Theme.colors.onSurface,
+    paddingVertical: 0,
   },
   textInput: {
-    backgroundColor: Palette.background,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.surfaceContainerLow,
     borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: Palette.textPrimary,
-    marginBottom: 16,
-  },
-  textAreaInput: {
-    backgroundColor: Palette.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: Palette.textPrimary,
-    lineHeight: 18,
-    minHeight: 90,
-    textAlignVertical: 'top',
-    marginBottom: 16,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    paddingHorizontal: Theme.spacing.md,
+    height: 48,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
   },
   modalSubmitButton: {
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: Theme.radii.sm,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: Theme.spacing.lg,
   },
   modalSubmitText: {
-    fontSize: 15,
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.white,
     fontWeight: '700',
-    color: Palette.white,
   },
+
+  /* Reminder Modal Specifics */
   reminderHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  textAreaInput: {
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    padding: Theme.spacing.md,
+    minHeight: 90,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+    textAlignVertical: 'top',
+  },
   reminderActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
+    marginTop: Theme.spacing.md,
   },
   shareFallbackBtn: {
     flex: 1,
-    backgroundColor: Palette.white,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 8,
-    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    height: 46,
   },
   shareFallbackText: {
-    fontSize: 13,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.primary,
     fontWeight: '600',
-    color: Palette.darkNavy,
   },
   whatsappSendBtn: {
-    flex: 1.5,
-    backgroundColor: Palette.successGreen,
-    borderRadius: 8,
-    paddingVertical: 12,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    backgroundColor: '#1E8E3E',
+    borderRadius: Theme.radii.sm,
+    height: 46,
   },
   whatsappSendText: {
-    fontSize: 13,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.white,
     fontWeight: '700',
-    color: Palette.white,
   },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  editHeaderBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 14,
-    marginBottom: 12,
-  },
-  profileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Palette.primaryBlueLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  profileAvatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.primaryBlueDark,
-  },
-  profileInfoCol: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.darkNavy,
-  },
-  profilePhoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  profilePhone: {
-    fontSize: 13,
-    color: Palette.textSecondary,
-    fontWeight: '500',
-  },
-  profileCreated: {
-    fontSize: 11,
-    color: Palette.textMuted,
-    marginTop: 2,
-  },
-  editProfileBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Palette.primaryBlueLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  editProfileBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.primaryBlueDark,
-  },
+
+  /* Edit Modal Specifics */
   editActionsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
+    gap: 12,
+    marginTop: Theme.spacing.lg,
   },
   cancelEditBtn: {
     flex: 1,
-    backgroundColor: Palette.white,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    borderRadius: 8,
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    height: 46,
   },
   cancelEditBtnText: {
-    fontSize: 14,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
     fontWeight: '600',
-    color: Palette.textSecondary,
   },
   saveEditBtn: {
-    flex: 1.5,
-    backgroundColor: Palette.primaryBlue,
-    borderRadius: 8,
-    paddingVertical: 12,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    backgroundColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.sm,
+    height: 46,
   },
   saveEditBtnDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   saveEditBtnText: {
-    fontSize: 14,
+    ...Theme.typography.labelMd,
+    color: Theme.colors.white,
     fontWeight: '700',
-    color: Palette.white,
   },
 });

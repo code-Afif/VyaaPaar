@@ -16,7 +16,7 @@ import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { ScreenHeader, AmountText } from '@/components/ui';
-import { formatPaise } from '@/utils/format';
+import { formatPaise, formatDisplayPhone } from '@/utils/format';
 import { Customer } from '@/types';
 
 type FilterTab = 'ALL' | 'DUE' | 'SETTLED';
@@ -26,16 +26,6 @@ function getInitials(name?: string) {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function formatDisplayPhone(phone?: string) {
-  if (!phone) return '';
-  const digits = phone.replace(/[^0-9]/g, '');
-  if (digits.length >= 10) {
-    const last10 = digits.slice(-10);
-    return `+91 ${last10.slice(0, 5)} •••••`;
-  }
-  return '••••• •••••';
 }
 
 export default function KhataScreen() {

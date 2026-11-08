@@ -29,3 +29,13 @@ export function paiseToRupees(paise: number): number {
 export function formatDate(dateStr: string): string {
   return dateStr;
 }
+
+export function formatDisplayPhone(phone?: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    return `+91 ${last10.slice(0, 5)} •••••`;
+  }
+  return '••••• •••••';
+}
