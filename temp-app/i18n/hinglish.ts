@@ -458,5 +458,6 @@ export const hinglish: typeof en = {
     filterDue: 'Baaki Hai',
     filterSettled: 'Clear',
     searchKhataPlaceholder: 'Grahak ka naam ya phone number...',
+    vyapaarKirana: 'VyaaPaar Kirana',
   },
 };

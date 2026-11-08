@@ -458,5 +458,6 @@ export const hi: typeof en = {
     filterDue: 'बाकी है',
     filterSettled: 'क्लियर',
     searchKhataPlaceholder: 'ग्राहक का नाम या फोन नंबर...',
+    vyapaarKirana: 'व्यापार किराना',
   },
 };

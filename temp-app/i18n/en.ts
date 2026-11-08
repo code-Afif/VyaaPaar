@@ -456,5 +456,6 @@ export const en = {
     filterDue: 'Due',
     filterSettled: 'Settled',
     searchKhataPlaceholder: 'Customer name or phone number...',
+    vyapaarKirana: 'VyaaPaar Kirana',
   },
 };

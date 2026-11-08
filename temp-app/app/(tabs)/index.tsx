@@ -86,7 +86,7 @@ export default function HomeScreen() {
     setAmountRupees('');
   };
 
-  const storeTitle = merchant?.storeName?.trim() || 'Sharma General Store';
+  const storeTitle = merchant?.storeName?.trim() || t('stitch.vyapaarKirana');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
