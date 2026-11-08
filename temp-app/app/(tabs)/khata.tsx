@@ -7,18 +7,36 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { Header } from '@/components/Header';
-import { CustomerCard } from '@/components/CustomerCard';
+import { ScreenHeader, AmountText } from '@/components/ui';
 import { formatPaise } from '@/utils/format';
+import { Customer } from '@/types';
 
 type FilterTab = 'ALL' | 'DUE' | 'SETTLED';
+
+function getInitials(name?: string) {
+  if (!name || !name.trim()) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function formatDisplayPhone(phone?: string) {
+  if (!phone) return '';
+  const digits = phone.replace(/[^0-9]/g, '');
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    return `+91 ${last10.slice(0, 5)} •••••`;
+  }
+  return phone;
+}
 
 export default function KhataScreen() {
   const router = useRouter();
@@ -37,6 +55,15 @@ export default function KhataScreen() {
       setIsRefreshing(false);
     }
   };
+
+  const dueCount = useMemo(
+    () => customers.filter((c) => (c.currentBalancePaise || 0) > 0).length,
+    [customers]
+  );
+  const settledCount = useMemo(
+    () => customers.filter((c) => (c.currentBalancePaise || 0) === 0).length,
+    [customers]
+  );
 
   const filteredCustomers = useMemo(() => {
     const safeQuery = searchQuery.trim().toLowerCase();
@@ -61,133 +88,191 @@ export default function KhataScreen() {
     });
   }, [customers, searchQuery, filterTab]);
 
-  if (__DEV__) {
-    console.log(
-      `[KhataScreen] Total in context: ${customers.length}, Filtered count: ${filteredCustomers.length}, Unique IDs: ${new Set(customers.map((c) => c.id)).size}`
-    );
-  }
+  const handleDownloadPdf = () => {
+    Alert.alert(t('stitch.reportBtn'), t('stitch.comingSoonNotice'));
+  };
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <Header
-        title={t('khata.headerTitle')}
-        subtitle={t('khata.headerSubtitle')}
-      />
+  const renderCustomerRow = ({ item }: { item: Customer }) => {
+    const balance = item.currentBalancePaise || 0;
+    const isDue = balance > 0;
+    const isSettled = balance === 0;
+    const initials = getInitials(item.name);
+    const maskedPhone = formatDisplayPhone(item.phone);
 
-      <View style={styles.container}>
-        {/* Khata Balance Summary Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryCol}>
-            <Text style={styles.summaryLabel}>{t('khata.totalUdhaar')}</Text>
-            <Text style={styles.summaryAmount}>
-              {formatPaise(briefing.totalOutstandingPaise)}
-            </Text>
+    return (
+      <Pressable
+        style={styles.customerRow}
+        onPress={() => router.push(`/customer/${item.id}`)}
+      >
+        <View style={styles.customerLeftCol}>
+          {/* Square initials avatar matching Stitch */}
+          <View style={styles.avatarBox}>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryColRight}>
-            <Text style={styles.summaryLabel}>{t('khata.totalCustomers')}</Text>
-            <Text style={styles.customerCountText}>
-              {t('khata.customerCount', { count: customers.length })}
+
+          <View style={styles.customerDetailsCol}>
+            <Text style={styles.customerName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {maskedPhone ? (
+              <Text style={styles.customerPhone}>{maskedPhone}</Text>
+            ) : null}
+            <Text style={styles.customerEntryHint}>
+              {t('stitch.lastEntryPrefix', { time: 'Khaata sakriya' })}
             </Text>
           </View>
         </View>
 
-        {/* Search Bar & Add Customer Button */}
-        <View style={styles.searchRow}>
-          <View style={styles.searchInputWrapper}>
-            <Ionicons name="search" size={18} color={Palette.textSecondary} />
+        <View style={styles.customerRightCol}>
+          <AmountText
+            amountPaise={balance}
+            variant={isDue ? 'red' : isSettled ? 'primary' : 'green'}
+            size="stat"
+            prefix={balance > 0 ? '' : balance < 0 ? '+ ' : ''}
+          />
+          <Text style={styles.balanceStatusSub}>
+            {isDue
+              ? t('stitch.owedSubtitle')
+              : isSettled
+              ? t('stitch.hisaabBarabar')
+              : t('stitch.advanceJama')}
+          </Text>
+          <Text
+            style={[
+              styles.actionLinkText,
+              isDue ? styles.actionLinkDue : styles.actionLinkSettled,
+            ]}
+          >
+            {isDue ? t('stitch.takaadaKarein') : t('stitch.hisaabBarabar')}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* TopAppBar with Report action */}
+      <ScreenHeader
+        title={t('tabs.khata')}
+        rightAction={
+          <View style={styles.headerRightActions}>
+            <Pressable
+              style={styles.headerActionBtn}
+              onPress={handleDownloadPdf}
+              hitSlop={10}
+              accessibilityLabel="Download Report"
+            >
+              <Ionicons name="download-outline" size={22} color={Theme.colors.onSurface} />
+            </Pressable>
+          </View>
+        }
+      />
+
+      <View style={styles.container}>
+        {/* Ledger Aggregate Summary (Single Ledger Anchor) */}
+        <View style={styles.aggregateSummary}>
+          <View style={styles.aggregateLeftCol}>
+            <Text style={styles.aggregateLabel}>{t('stitch.totalUdhaarOwed')}</Text>
+            <AmountText
+              amountPaise={briefing.totalOutstandingPaise || 0}
+              variant="red"
+              size="hero"
+              style={styles.aggregateAmount}
+            />
+          </View>
+          <View style={styles.aggregateRightCol}>
+            <Text style={styles.aggregateLabel}>{t('stitch.totalGrahak')}</Text>
+            <Text style={styles.aggregateCustomerCount}>
+              {customers.length} {t('stitch.grahakCountUnit', { count: '' }).trim()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Search & Ruled Input */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons name="search" size={18} color={Theme.colors.onSurfaceVariant} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder={t('khata.searchPlaceholder')}
-              placeholderTextColor={Palette.textMuted}
+              placeholder={t('stitch.searchKhataPlaceholder')}
+              placeholderTextColor={Theme.colors.outline}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={16} color={Palette.textMuted} />
+                <Ionicons name="close-circle" size={16} color={Theme.colors.outline} />
               </Pressable>
             )}
           </View>
-
-          <Pressable
-            style={styles.addCustomerBtn}
-            onPress={() => router.push('/customer/new')}
-            accessibilityLabel={t('khata.addCustomerBtn')}
-          >
-            <Ionicons name="person-add" size={18} color={Palette.white} />
-            <Text style={styles.addCustomerBtnText}>{t('khata.addCustomerBtn')}</Text>
-          </Pressable>
         </View>
 
-        {/* Filter Tabs */}
-        <View style={styles.tabsRow}>
+        {/* Plain Text Ruled Filter Tabs */}
+        <View style={styles.filterTabsRow}>
           <Pressable
-            style={[styles.tabChip, filterTab === 'ALL' && styles.tabChipActive]}
+            style={[styles.filterTab, filterTab === 'ALL' && styles.filterTabActive]}
             onPress={() => setFilterTab('ALL')}
           >
-            <Text
-              style={[
-                styles.tabText,
-                filterTab === 'ALL' && styles.tabTextActive,
-              ]}
-            >
-              {t('khata.tabAll', { count: customers.length })}
+            <Text style={[styles.filterTabText, filterTab === 'ALL' && styles.filterTabTextActive]}>
+              {t('stitch.filterAll')}
             </Text>
+            <Text style={styles.filterTabCount}>({customers.length})</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.tabChip, filterTab === 'DUE' && styles.tabChipActive]}
+            style={[styles.filterTab, filterTab === 'DUE' && styles.filterTabActive]}
             onPress={() => setFilterTab('DUE')}
           >
-            <Text
-              style={[
-                styles.tabText,
-                filterTab === 'DUE' && styles.tabTextActive,
-              ]}
-            >
-              {t('khata.tabDue', {
-                count: customers.filter((c) => c.currentBalancePaise > 0).length,
-              })}
+            <Text style={[styles.filterTabText, filterTab === 'DUE' && styles.filterTabTextActive]}>
+              {t('stitch.filterDue')}
             </Text>
+            <Text style={[styles.filterTabCount, styles.filterTabCountDue]}>({dueCount})</Text>
           </Pressable>
 
           <Pressable
-            style={[styles.tabChip, filterTab === 'SETTLED' && styles.tabChipActive]}
+            style={[styles.filterTab, filterTab === 'SETTLED' && styles.filterTabActive]}
             onPress={() => setFilterTab('SETTLED')}
           >
-            <Text
-              style={[
-                styles.tabText,
-                filterTab === 'SETTLED' && styles.tabTextActive,
-              ]}
-            >
-              {t('khata.tabSettled', {
-                count: customers.filter((c) => c.currentBalancePaise === 0).length,
-              })}
+            <Text style={[styles.filterTabText, filterTab === 'SETTLED' && styles.filterTabTextActive]}>
+              {t('stitch.filterSettled')}
             </Text>
+            <Text style={styles.filterTabCount}>({settledCount})</Text>
           </Pressable>
         </View>
 
-        {/* Customers List */}
+        {/* Sort & View Hint Strip */}
+        <View style={styles.sortStrip}>
+          <Text style={styles.sortStripLabel}>
+            {t('stitch.grahakSoochiHeader', { count: filteredCustomers.length })}
+          </Text>
+          <View style={styles.sortRight}>
+            <Text style={styles.sortRightText}>{t('stitch.sortTime')}</Text>
+            <Ionicons name="arrow-down" size={12} color={Theme.colors.onSurfaceVariant} />
+          </View>
+        </View>
+
+        {/* Customers Ledger FlatList */}
         <FlatList
           style={styles.list}
           data={filteredCustomers}
           keyExtractor={(item) => item.id}
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
-          renderItem={({ item }) => (
-            <CustomerCard
-              customer={item}
-              onPress={() => router.push(`/customer/${item.id}`)}
-            />
-          )}
+          renderItem={renderCustomerRow}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            filteredCustomers.length > 0 ? (
+              <View style={styles.listFooter}>
+                <Text style={styles.listFooterText}>{t('stitch.pannaPurna')}</Text>
+              </View>
+            ) : undefined
+          }
           ListEmptyComponent={
             isLoading ? (
               <View style={styles.emptyContainer}>
-                <ActivityIndicator size="large" color={Palette.primaryBlue} />
+                <ActivityIndicator size="large" color={Theme.colors.primaryContainer} />
                 <Text style={[styles.emptySub, { marginTop: 12 }]}>
                   {t('khata.loadingCustomers')}
                 </Text>
@@ -197,22 +282,52 @@ export default function KhataScreen() {
                 <Ionicons
                   name="people-outline"
                   size={48}
-                  color={Palette.textMuted}
+                  color={Theme.colors.outline}
                 />
                 <Text style={styles.emptyTitle}>{t('khata.emptyTitle')}</Text>
-                <Text style={styles.emptySub}>
-                  {t('khata.emptySub')}
-                </Text>
+                <Text style={styles.emptySub}>{t('khata.emptySub')}</Text>
                 <Pressable
                   style={styles.emptyButton}
                   onPress={() => router.push('/customer/new')}
                 >
-                  <Text style={styles.emptyButtonText}>{t('khata.emptyBtn')}</Text>
+                  <Text style={styles.emptyButtonText}>{t('stitch.nayaGrahakBtn')}</Text>
                 </Pressable>
               </View>
             )
           }
         />
+
+        {/* Pinned Primary Action Bar above bottom navigation */}
+        <View style={styles.dockedActionBar}>
+          <Pressable
+            style={styles.primaryAddBtn}
+            onPress={() => router.push('/customer/new')}
+            accessibilityLabel={t('stitch.nayaGrahakBtn')}
+          >
+            <Ionicons name="person-add" size={18} color={Theme.colors.onPrimary} />
+            <Text style={styles.primaryAddBtnText}>{t('stitch.nayaGrahakBtn')}</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.reportIconBtn}
+            onPress={handleDownloadPdf}
+            accessibilityLabel={t('stitch.reportBtn')}
+          >
+            <Ionicons name="document-text-outline" size={22} color={Theme.colors.onSurface} />
+          </Pressable>
+        </View>
+
+        {/* Floating Voice Mic Button with text badge */}
+        <View style={styles.voiceFabContainer}>
+          <Pressable
+            style={styles.voiceFab}
+            onPress={() => router.push('/voice')}
+            accessibilityLabel={t('stitch.bolKarLikhein')}
+          >
+            <Ionicons name="mic" size={24} color={Theme.colors.onPrimary} />
+          </Pressable>
+          <Text style={styles.voiceFabBadge}>{t('stitch.bolKarLikhein')}</Text>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -221,153 +336,342 @@ export default function KhataScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
-  summaryCard: {
-    backgroundColor: Palette.darkNavy,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    borderRadius: 12,
-    padding: 16,
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  headerActionBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Aggregate Summary Anchor */
+  aggregateSummary: {
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingTop: Theme.spacing.md,
+    paddingBottom: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+    flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  summaryCol: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  summaryAmount: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Palette.dangerRed,
-  },
-  summaryDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: '#334E68',
-    marginHorizontal: 16,
-  },
-  summaryColRight: {
     alignItems: 'flex-end',
   },
-  customerCountText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Palette.white,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 10,
-    alignItems: 'center',
-  },
-  searchInputWrapper: {
+  aggregateLeftCol: {
     flex: 1,
+  },
+  aggregateRightCol: {
+    alignItems: 'flex-end',
+  },
+  aggregateLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  aggregateAmount: {
+    color: Theme.colors.moneyRed,
+    marginTop: 2,
+  },
+  aggregateCustomerCount: {
+    ...Theme.typography.titleMd,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+    marginTop: 4,
+  },
+
+  /* Search Section */
+  searchSection: {
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+  },
+  searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.white,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 42,
     borderWidth: 1,
-    borderColor: Palette.border,
-    gap: 8,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  searchIcon: {
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: Palette.textPrimary,
+    fontSize: 14,
+    color: Theme.colors.onSurface,
+    paddingVertical: 0,
   },
-  addCustomerBtn: {
-    backgroundColor: Palette.primaryBlue,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    height: 42,
+
+  /* Plain Text Ruled Filter Tabs */
+  filterTabsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Theme.spacing.gutter,
+    gap: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+  },
+  filterTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    gap: 4,
   },
-  addCustomerBtnText: {
-    color: Palette.white,
-    fontSize: 13,
+  filterTabActive: {
+    borderBottomColor: Theme.colors.primaryContainer,
+  },
+  filterTabText: {
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
+    fontWeight: '500',
+  },
+  filterTabTextActive: {
+    color: Theme.colors.primaryContainer,
     fontWeight: '700',
   },
-  tabsRow: {
+  filterTabCount: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+  },
+  filterTabCountDue: {
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+
+  /* Sort & View Hint Strip */
+  sortStrip: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceContainerLow,
   },
-  tabChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: Palette.white,
-    borderWidth: 1,
-    borderColor: Palette.border,
+  sortStripLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  tabChipActive: {
-    backgroundColor: Palette.primaryBlue,
-    borderColor: Palette.primaryBlue,
+  sortRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Palette.textSecondary,
+  sortRightText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurfaceVariant,
+    textTransform: 'uppercase',
   },
-  tabTextActive: {
-    color: Palette.white,
-    fontWeight: '700',
-  },
-  listContent: {
-    paddingBottom: 24,
-  },
+
+  /* List & Rows */
   list: {
     flex: 1,
   },
+  listContent: {
+    paddingBottom: 140,
+  },
+  customerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+  },
+  customerLeftCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  avatarBox: {
+    width: 40,
+    height: 40,
+    borderRadius: Theme.radii.none,
+    backgroundColor: Theme.colors.surfaceVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.primaryContainer,
+    fontWeight: '700',
+  },
+  customerDetailsCol: {
+    flex: 1,
+  },
+  customerName: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onSurface,
+    fontWeight: '700',
+  },
+  customerPhone: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  customerEntryHint: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+    marginTop: 2,
+  },
+  customerRightCol: {
+    alignItems: 'flex-end',
+  },
+  balanceStatusSub: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  actionLinkText: {
+    ...Theme.typography.labelMd,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  actionLinkDue: {
+    color: Theme.colors.secondary,
+  },
+  actionLinkSettled: {
+    color: Theme.colors.outline,
+  },
+
+  /* List Footer */
+  listFooter: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  listFooterText: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.outline,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  /* Empty State */
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 32,
+    paddingVertical: 60,
+    paddingHorizontal: 24,
   },
   emptyTitle: {
-    fontSize: 16,
+    ...Theme.typography.titleMd,
     fontWeight: '700',
-    color: Palette.darkNavy,
+    color: Theme.colors.onSurface,
     marginTop: 12,
   },
   emptySub: {
-    fontSize: 13,
-    color: Palette.textSecondary,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 6,
-    lineHeight: 18,
+    marginBottom: 20,
   },
   emptyButton: {
-    marginTop: 18,
-    backgroundColor: Palette.primaryBlue,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.primaryContainer,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   emptyButtonText: {
-    color: Palette.white,
-    fontSize: 13,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onPrimary,
     fontWeight: '700',
+  },
+
+  /* Pinned Docked Action Bar */
+  dockedActionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 64,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Theme.spacing.gutter,
+    gap: 12,
+  },
+  primaryAddBtn: {
+    flex: 1,
+    height: 48,
+    backgroundColor: Theme.colors.primaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: Theme.radii.none,
+  },
+  primaryAddBtnText: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onPrimary,
+    fontWeight: '700',
+  },
+  reportIconBtn: {
+    width: 48,
+    height: 48,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Theme.radii.none,
+  },
+
+  /* Floating Mic Action Button */
+  voiceFabContainer: {
+    position: 'absolute',
+    right: 16,
+    bottom: 76,
+    alignItems: 'center',
+  },
+  voiceFab: {
+    width: 52,
+    height: 52,
+    borderRadius: Theme.radii.full,
+    backgroundColor: Theme.colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Theme.colors.primaryContainer,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  voiceFabBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Theme.colors.primaryContainer,
+    backgroundColor: Theme.colors.surface,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginTop: 3,
+    textTransform: 'uppercase',
   },
 });

@@ -66,3 +66,4 @@ export const AmountText: React.FC<AmountTextProps> = ({
     </Text>
   );
 };
+
