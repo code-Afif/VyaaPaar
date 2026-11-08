@@ -9,7 +9,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useLanguage } from '@/context/LanguageContext';
 import { Language } from '@/i18n';
 
@@ -73,7 +73,7 @@ export default function LanguageScreen() {
             hitSlop={10}
             accessibilityLabel="Go Back"
           >
-            <Ionicons name="arrow-back" size={24} color={Palette.darkNavy} />
+            <Ionicons name="arrow-back" size={22} color={Theme.colors.onSurface} />
           </Pressable>
           <Text style={styles.topBarTitle}>{t('settings.languageHeading')}</Text>
           <View style={{ width: 24 }} />
@@ -157,7 +157,7 @@ export default function LanguageScreen() {
           <Text style={styles.continueButtonText}>
             {t('languageScreen.continueBtn')}
           </Text>
-          <Ionicons name="arrow-forward" size={18} color={Palette.white} />
+          <Ionicons name="arrow-forward" size={18} color={Theme.colors.onPrimary} />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -167,83 +167,75 @@ export default function LanguageScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: Theme.spacing.gutter,
+    height: 56,
     borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceCard,
   },
   backButton: {
-    padding: 4,
-    minWidth: 48,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 6,
   },
   topBarTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+    ...Theme.typography.titleMd,
+    color: Theme.colors.onSurface,
   },
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
   contentContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingTop: Theme.spacing.md,
+    paddingBottom: 24,
   },
   headerSection: {
     marginTop: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   mainHeading: {
-    fontSize: 18,
+    ...Theme.typography.titleMd,
+    fontSize: 20,
     fontWeight: '800',
-    color: Palette.darkNavy,
-    lineHeight: 25,
-    letterSpacing: 0.1,
+    color: Theme.colors.onSurface,
+    lineHeight: 28,
   },
   subHeading: {
-    fontSize: 13,
-    color: Palette.textSecondary,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurfaceVariant,
     marginTop: 6,
     lineHeight: 18,
   },
   optionsList: {
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 16,
   },
   optionCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Palette.border,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: Theme.colors.surfaceCard,
+    borderRadius: Theme.radii.md,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    paddingHorizontal: Theme.spacing.lg,
+    paddingVertical: Theme.spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 64,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
   },
   optionCardSelected: {
-    borderColor: Palette.primaryBlue,
-    backgroundColor: '#F0F9FF',
+    borderColor: Theme.colors.primaryContainer,
+    backgroundColor: Theme.colors.surfaceContainerLow,
   },
   optionContent: {
     flex: 1,
     marginRight: 12,
+    gap: 2,
   },
   optionNameRow: {
     flexDirection: 'row',
@@ -251,73 +243,66 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   nativeName: {
-    fontSize: 17,
+    ...Theme.typography.bodyLg,
     fontWeight: '700',
-    color: Palette.darkNavy,
+    color: Theme.colors.onSurface,
   },
   textSelected: {
-    color: Palette.primaryBlueDark,
+    color: Theme.colors.primaryContainer,
   },
   pill: {
-    backgroundColor: Palette.primaryBlueLight,
+    backgroundColor: Theme.colors.surfaceContainer,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: Theme.radii.sm,
   },
   pillText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Palette.primaryBlueDark,
+    color: Theme.colors.primaryContainer,
   },
   exampleText: {
-    fontSize: 12,
-    color: Palette.textSecondary,
-    marginTop: 3,
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
     lineHeight: 16,
   },
   radioCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: Palette.border,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Theme.colors.outline,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioCircleSelected: {
-    borderColor: Palette.primaryBlue,
+    borderColor: Theme.colors.primaryContainer,
   },
   radioInnerCircle: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Palette.primaryBlue,
+    backgroundColor: Theme.colors.primaryContainer,
   },
   bottomBar: {
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surfaceCard,
     borderTopWidth: 1,
-    borderTopColor: Palette.border,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    borderTopColor: Theme.colors.hairline,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
   },
   continueButton: {
-    backgroundColor: Palette.primaryBlue,
-    borderRadius: 10,
-    minHeight: 48,
+    backgroundColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.sm,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   continueButtonText: {
-    color: Palette.white,
-    fontSize: 15,
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onPrimary,
     fontWeight: '700',
   },
 });
-
