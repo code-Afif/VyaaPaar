@@ -35,7 +35,7 @@ function formatDisplayPhone(phone?: string) {
     const last10 = digits.slice(-10);
     return `+91 ${last10.slice(0, 5)} •••••`;
   }
-  return phone;
+  return '••••• •••••';
 }
 
 export default function KhataScreen() {
@@ -87,10 +87,6 @@ export default function KhataScreen() {
       return true;
     });
   }, [customers, searchQuery, filterTab]);
-
-  const handleDownloadPdf = () => {
-    Alert.alert(t('stitch.reportBtn'), t('stitch.comingSoonNotice'));
-  };
 
   const renderCustomerRow = ({ item }: { item: Customer }) => {
     const balance = item.currentBalancePaise || 0;
@@ -152,19 +148,18 @@ export default function KhataScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* TopAppBar with Report action */}
+      {/* TopAppBar with visibly disabled Report badge */}
       <ScreenHeader
         title={t('tabs.khata')}
         rightAction={
-          <View style={styles.headerRightActions}>
-            <Pressable
-              style={styles.headerActionBtn}
-              onPress={handleDownloadPdf}
-              hitSlop={10}
-              accessibilityLabel="Download Report"
-            >
-              <Ionicons name="download-outline" size={22} color={Theme.colors.onSurface} />
-            </Pressable>
+          <View
+            style={styles.headerReportDisabledBadge}
+            accessibilityLabel={`${t('stitch.reportBtn')} - ${t('stitch.comingSoonNotice')}`}
+          >
+            <Ionicons name="document-text-outline" size={13} color={Theme.colors.outline} />
+            <Text style={styles.headerReportDisabledText}>
+              {t('stitch.reportBtn')} · {t('stitch.comingSoonNotice')}
+            </Text>
           </View>
         }
       />
@@ -241,15 +236,11 @@ export default function KhataScreen() {
           </Pressable>
         </View>
 
-        {/* Sort & View Hint Strip */}
+        {/* Customer Count Strip */}
         <View style={styles.sortStrip}>
           <Text style={styles.sortStripLabel}>
             {t('stitch.grahakSoochiHeader', { count: filteredCustomers.length })}
           </Text>
-          <View style={styles.sortRight}>
-            <Text style={styles.sortRightText}>{t('stitch.sortTime')}</Text>
-            <Ionicons name="arrow-down" size={12} color={Theme.colors.onSurfaceVariant} />
-          </View>
         </View>
 
         {/* Customers Ledger FlatList */}
@@ -308,13 +299,12 @@ export default function KhataScreen() {
             <Text style={styles.primaryAddBtnText}>{t('stitch.nayaGrahakBtn')}</Text>
           </Pressable>
 
-          <Pressable
-            style={styles.reportIconBtn}
-            onPress={handleDownloadPdf}
-            accessibilityLabel={t('stitch.reportBtn')}
+          <View
+            style={[styles.reportIconBtn, { opacity: 0.4 }]}
+            accessibilityLabel={`${t('stitch.reportBtn')} - ${t('stitch.comingSoonNotice')}`}
           >
-            <Ionicons name="document-text-outline" size={22} color={Theme.colors.onSurface} />
-          </Pressable>
+            <Ionicons name="document-text-outline" size={22} color={Theme.colors.outline} />
+          </View>
         </View>
 
         {/* Floating Voice Mic Button with text badge */}
@@ -347,11 +337,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  headerActionBtn: {
-    width: 40,
-    height: 40,
+  headerReportDisabledBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: Theme.colors.surfaceContainer,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+  },
+  headerReportDisabledText: {
+    ...Theme.typography.labelMd,
+    fontSize: 11,
+    color: Theme.colors.outline,
+    fontWeight: '500',
   },
 
   /* Aggregate Summary Anchor */
@@ -469,16 +470,6 @@ const styles = StyleSheet.create({
     ...Theme.typography.labelMd,
     color: Theme.colors.onSurfaceVariant,
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  sortRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  sortRightText: {
-    ...Theme.typography.labelMd,
-    color: Theme.colors.onSurfaceVariant,
     textTransform: 'uppercase',
   },
 

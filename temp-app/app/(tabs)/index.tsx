@@ -41,6 +41,24 @@ export default function HomeScreen() {
   const recentTransactions = useMemo(() => ledgerEntries.slice(0, 5), [ledgerEntries]);
 
   // Derived real alerts (NO FAKE / INVENTED DATA)
+  // Strictly calculate real today's repayments from ledgerEntries (no fake seeds)
+  const todayCollectedPaise = useMemo(() => {
+    return ledgerEntries
+      .filter(
+        (l) =>
+          l.type === 'REPAYMENT' &&
+          (l.createdAt.includes('Today') || l.createdAt.includes('Just now'))
+      )
+      .reduce((sum, l) => sum + l.amountPaise, 0);
+  }, [ledgerEntries]);
+
+  // Strictly calculate real today's transactions count
+  const todayEntriesCount = useMemo(() => {
+    return ledgerEntries.filter(
+      (l) => l.createdAt.includes('Today') || l.createdAt.includes('Just now')
+    ).length;
+  }, [ledgerEntries]);
+
   const topOverdueCustomer = useMemo(() => {
     return customers
       .filter((c) => (c.currentBalancePaise || 0) > 0)
@@ -129,11 +147,11 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {/* Right: Aaj ka Payment */}
+            {/* Right: Aaj ka Payment (Strictly today's repayments) */}
             <View style={styles.heroColRight}>
               <Text style={styles.heroColLabel}>{t('stitch.aajKaPayment')}</Text>
               <Text style={styles.heroColValueGreen}>
-                + {formatPaise(briefing.totalCollectedPaise || 0)}
+                + {formatPaise(todayCollectedPaise)}
               </Text>
             </View>
           </View>
@@ -209,7 +227,7 @@ export default function HomeScreen() {
               <View style={styles.ledgerRowTextCol}>
                 <Text style={styles.ledgerRowTitle}>{t('stitch.aajKaHisaabTitle')}</Text>
                 <Text style={styles.ledgerRowSubtitle}>
-                  {t('stitch.aajKaHisaabSub', { count: ledgerEntries.length })}
+                  {t('stitch.aajKaHisaabSub', { count: todayEntriesCount })}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={Theme.colors.onSurfaceVariant} />
