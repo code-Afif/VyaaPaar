@@ -198,6 +198,7 @@ export const supabaseService = {
         hour: '2-digit',
         minute: '2-digit',
       }),
+      createdAtIso: d.created_at,
       source: d.source as any,
       isSimulated: false,
     }));

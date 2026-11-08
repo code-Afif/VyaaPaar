@@ -212,25 +212,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [customers]);
 
   const totalCollectedTodayPaise = useMemo(() => {
+    const baseline = isDemoMode ? 920000 : 0;
     return ledgerEntries
       .filter((l) => l.type === 'REPAYMENT' && (l.createdAt.includes('Today') || l.createdAt.includes('Just now')))
-      .reduce((sum, l) => sum + l.amountPaise, 920000);
-  }, [ledgerEntries]);
+      .reduce((sum, l) => sum + l.amountPaise, baseline);
+  }, [ledgerEntries, isDemoMode]);
 
   const totalSalesTodayPaise = useMemo(() => {
+    const baseline = isDemoMode ? 1485000 : 0;
     return ledgerEntries
       .filter((l) => l.type === 'CREDIT_SALE' && (l.createdAt.includes('Today') || l.createdAt.includes('Just now')))
-      .reduce((sum, l) => sum + l.amountPaise, 1485000);
-  }, [ledgerEntries]);
+      .reduce((sum, l) => sum + l.amountPaise, baseline);
+  }, [ledgerEntries, isDemoMode]);
 
   const briefing: DailyBriefing = useMemo(() => {
+    const base = isDemoMode
+      ? INITIAL_BRIEFING
+      : {
+          ...INITIAL_BRIEFING,
+          totalSalesPaise: 0,
+          totalCollectedPaise: 0,
+          totalExpensesPaise: 0,
+          estimatedGrossProfitPaise: 0,
+          lowStockCount: 0,
+        };
     return {
-      ...INITIAL_BRIEFING,
+      ...base,
       totalOutstandingPaise,
       totalCollectedPaise: totalCollectedTodayPaise,
       totalSalesPaise: totalSalesTodayPaise,
     };
-  }, [totalOutstandingPaise, totalCollectedTodayPaise, totalSalesTodayPaise]);
+  }, [totalOutstandingPaise, totalCollectedTodayPaise, totalSalesTodayPaise, isDemoMode]);
 
   const setDemoMode = (demo: boolean) => {
     setIsDemoMode(demo);
@@ -311,6 +323,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           amountPaise: openingBalancePaise,
           description: 'Opening Balance (Pichhla Purana Udhaar)',
           createdAt: 'Just now',
+          createdAtIso: new Date().toISOString(),
           source: 'MANUAL',
           isSimulated: true,
         };
@@ -406,6 +419,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       amountPaise,
       description: description.trim() || 'Groceries / Kirana samaan',
       createdAt: 'Today, Just now',
+      createdAtIso: new Date().toISOString(),
       source,
       isSimulated: isDemoMode,
     };
@@ -461,6 +475,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       amountPaise,
       description: description.trim() || 'Repayment / Jama kiya',
       createdAt: 'Today, Just now',
+      createdAtIso: new Date().toISOString(),
       source,
       paymentEventId,
       isSimulated: isDemoMode,

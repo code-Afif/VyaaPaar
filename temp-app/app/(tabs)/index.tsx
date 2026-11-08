@@ -18,6 +18,18 @@ import { useLanguage } from '@/context/LanguageContext';
 import { ScreenHeader, AmountText } from '@/components/ui';
 import { formatPaise, rupeesToPaise } from '@/utils/format';
 
+function isCreatedToday(isoString?: string): boolean {
+  if (!isoString) return false;
+  const entryDate = new Date(isoString);
+  if (isNaN(entryDate.getTime())) return false;
+  const now = new Date();
+  return (
+    entryDate.getFullYear() === now.getFullYear() &&
+    entryDate.getMonth() === now.getMonth() &&
+    entryDate.getDate() === now.getDate()
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const {
@@ -41,22 +53,16 @@ export default function HomeScreen() {
   const recentTransactions = useMemo(() => ledgerEntries.slice(0, 5), [ledgerEntries]);
 
   // Derived real alerts (NO FAKE / INVENTED DATA)
-  // Strictly calculate real today's repayments from ledgerEntries (no fake seeds)
+  // Strictly calculate real today's repayments from ledgerEntries using device local date
   const todayCollectedPaise = useMemo(() => {
     return ledgerEntries
-      .filter(
-        (l) =>
-          l.type === 'REPAYMENT' &&
-          (l.createdAt.includes('Today') || l.createdAt.includes('Just now'))
-      )
+      .filter((l) => l.type === 'REPAYMENT' && isCreatedToday(l.createdAtIso))
       .reduce((sum, l) => sum + l.amountPaise, 0);
   }, [ledgerEntries]);
 
-  // Strictly calculate real today's transactions count
+  // Strictly calculate real today's transactions count using device local date
   const todayEntriesCount = useMemo(() => {
-    return ledgerEntries.filter(
-      (l) => l.createdAt.includes('Today') || l.createdAt.includes('Just now')
-    ).length;
+    return ledgerEntries.filter((l) => isCreatedToday(l.createdAtIso)).length;
   }, [ledgerEntries]);
 
   const topOverdueCustomer = useMemo(() => {

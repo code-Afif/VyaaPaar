@@ -22,6 +22,7 @@ export interface LedgerEntry {
   amountPaise: number;
   description: string;
   createdAt: string;
+  createdAtIso?: string;
   paymentEventId?: string;
   isSimulated?: boolean;
   source: TransactionSource;
