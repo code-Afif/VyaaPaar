@@ -115,6 +115,8 @@ export const en = {
     phonePlaceholder: '9876543210',
     openingBalanceLabel: 'Previous Balance (Opening Balance, optional)',
     openingBalancePlaceholder: '0 (If previous credit is pending)',
+    udhaarToggle: 'Udhaar Baaki',
+    advanceToggle: 'Advance Jama',
     createBtn: 'Create Customer Account',
     creatingBtn: 'Creating...',
     nameValidationTitle: 'Name Required',

@@ -117,6 +117,8 @@ export const hi: typeof en = {
     phonePlaceholder: '9876543210',
     openingBalanceLabel: 'पिछला पुराना उधार (आरंभिक शेष, ऐच्छिक)',
     openingBalancePlaceholder: '0 (अगर पहले से उधार बाकी हो)',
+    udhaarToggle: 'उधार बाकी',
+    advanceToggle: 'एडवांस जमा',
     createBtn: 'ग्राहक खाता बनाएं',
     creatingBtn: 'खाता बन रहा है...',
     nameValidationTitle: 'नाम अनिवार्य है',

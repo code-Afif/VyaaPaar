@@ -117,6 +117,8 @@ export const hinglish: typeof en = {
     phonePlaceholder: '9876543210',
     openingBalanceLabel: 'Pichhla Purana Udhaar (Opening Balance, optional)',
     openingBalancePlaceholder: '0 (Agar pehle se udhaar baaki ho)',
+    udhaarToggle: 'Udhaar Baaki',
+    advanceToggle: 'Advance Jama',
     createBtn: 'Grahak Khata Banayein',
     creatingBtn: 'Creating...',
     nameValidationTitle: 'Name Required',

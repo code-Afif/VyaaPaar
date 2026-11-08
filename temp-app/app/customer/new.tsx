@@ -8,11 +8,13 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { rupeesToPaise } from '@/utils/format';
@@ -71,88 +73,143 @@ export default function NewCustomerScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={10} accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={Palette.darkNavy} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('customerNew.headerTitle')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.formCard}>
-          {/* Customer Name */}
-          <Text style={styles.label}>
-            {t('customerNew.nameLabel')} <Text style={styles.required}>*</Text>
-          </Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="person-outline" size={18} color={Palette.textSecondary} />
-            <TextInput
-              style={styles.input}
-              placeholder={t('customerNew.namePlaceholder')}
-              placeholderTextColor={Palette.textMuted}
-              value={name}
-              onChangeText={setName}
-              autoFocus
-            />
-          </View>
-
-          {/* Mobile Number */}
-          <Text style={styles.label}>{t('customerNew.phoneLabel')}</Text>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="call-outline" size={18} color={Palette.textSecondary} />
-            <TextInput
-              style={styles.input}
-              placeholder={t('customerNew.phonePlaceholder')}
-              placeholderTextColor={Palette.textMuted}
-              keyboardType="phone-pad"
-              maxLength={13}
-              value={phone}
-              onChangeText={setPhone}
-            />
-          </View>
-
-          {/* Opening Balance */}
-          <Text style={styles.label}>
-            {t('customerNew.openingBalanceLabel')}
-          </Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.rupeePrefix}>₹</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t('customerNew.openingBalancePlaceholder')}
-              placeholderTextColor={Palette.textMuted}
-              keyboardType="numeric"
-              value={openingBalance}
-              onChangeText={setOpeningBalance}
-            />
+        {/* Top Sheet Drag Handle & Header */}
+        <View style={styles.sheetHeader}>
+          <View style={styles.dragHandle} />
+          <View style={styles.headerBar}>
+            <View style={styles.headerTitleCol}>
+              <Text style={styles.sheetTitle}>{t('customerNew.headerTitle')}</Text>
+              <Text style={styles.sheetSubtitle}>
+                {t('stitch.grahakSoochiHeader', { count: '' }).trim()} · Dukaan Bahi-Khata
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.closeBtn}
+              hitSlop={10}
+              accessibilityLabel={t('common.close')}
+            >
+              <Ionicons name="close" size={22} color={Theme.colors.onSurface} />
+            </Pressable>
           </View>
         </View>
 
-        {/* Save Button */}
-        <Pressable
-          style={[styles.saveButton, isSubmitting && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={isSubmitting}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {isSubmitting ? (
-            <>
-              <ActivityIndicator size="small" color={Palette.white} />
-              <Text style={styles.saveButtonText}>{t('customerNew.creatingBtn')}</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={20} color={Palette.white} />
-              <Text style={styles.saveButtonText}>{t('customerNew.createBtn')}</Text>
-            </>
-          )}
-        </Pressable>
-      </ScrollView>
+          {/* Section: Customer Details Card */}
+          <View style={styles.formCard}>
+            {/* Customer Name Field */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>
+                {t('customerNew.nameLabel')}{' '}
+                <Text style={styles.requiredStar}>{t('customerNew.nameRequired')}</Text>
+              </Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={Theme.colors.onSurfaceVariant}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder={t('customerNew.namePlaceholder')}
+                  placeholderTextColor={Theme.colors.outline}
+                  value={name}
+                  onChangeText={setName}
+                  autoFocus
+                />
+              </View>
+            </View>
+
+            {/* Mobile Number Field */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>{t('customerNew.phoneLabel')}</Text>
+              <View style={styles.phoneInputWrapper}>
+                <View style={styles.countryCodeBox}>
+                  <Text style={styles.countryCodeText}>+91</Text>
+                </View>
+                <TextInput
+                  style={styles.phoneTextInput}
+                  placeholder={t('customerNew.phonePlaceholder')}
+                  placeholderTextColor={Theme.colors.outline}
+                  keyboardType="phone-pad"
+                  maxLength={13}
+                  value={phone}
+                  onChangeText={setPhone}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Section: Opening Balance Card */}
+          <View style={styles.formCard}>
+            <Text style={styles.fieldLabel}>{t('customerNew.openingBalanceLabel')}</Text>
+
+            {/* Segmented Type Toggle (Udhaar Baaki Active, Advance Jama Disabled) */}
+            <View style={styles.toggleRow}>
+              <View style={[styles.toggleBtn, styles.toggleBtnActive]}>
+                <Ionicons name="remove-circle" size={16} color={Theme.colors.moneyRed} />
+                <Text style={styles.toggleTextActive}>{t('customerNew.udhaarToggle')}</Text>
+              </View>
+
+              <View
+                style={[styles.toggleBtn, styles.toggleBtnDisabled]}
+                accessibilityLabel={`${t('customerNew.advanceToggle')} - ${t('account.comingSoon')}`}
+              >
+                <Ionicons name="add-circle-outline" size={16} color={Theme.colors.outline} />
+                <Text style={styles.toggleTextDisabled}>
+                  {t('customerNew.advanceToggle')} ({t('account.comingSoon')})
+                </Text>
+              </View>
+            </View>
+
+            {/* Amount Ruled Input */}
+            <View style={styles.amountInputWrapper}>
+              <Text style={styles.rupeeSymbol}>₹</Text>
+              <TextInput
+                style={styles.amountTextInput}
+                placeholder={t('customerNew.openingBalancePlaceholder')}
+                placeholderTextColor={Theme.colors.outline}
+                keyboardType="numeric"
+                value={openingBalance}
+                onChangeText={setOpeningBalance}
+              />
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Docked Bottom CTA Bar */}
+        <View style={styles.bottomDockedBar}>
+          <Pressable
+            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            onPress={handleSave}
+            disabled={isSubmitting}
+            accessibilityLabel={t('customerNew.createBtn')}
+          >
+            {isSubmitting ? (
+              <>
+                <ActivityIndicator size="small" color={Theme.colors.onPrimary} />
+                <Text style={styles.submitButtonText}>{t('customerNew.creatingBtn')}</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="person-add" size={18} color={Theme.colors.onPrimary} />
+                <Text style={styles.submitButtonText}>{t('customerNew.createBtn')}</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -160,93 +217,224 @@ export default function NewCustomerScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Palette.white,
+    backgroundColor: Theme.colors.surface,
   },
-  header: {
-    backgroundColor: Palette.white,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  keyboardAvoid: {
+    flex: 1,
+  },
+
+  /* Top Sheet Header */
+  sheetHeader: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    alignItems: 'center',
+    paddingTop: Theme.spacing.sm,
+    paddingBottom: Theme.spacing.md,
+    paddingHorizontal: Theme.spacing.gutter,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: Theme.radii.sm,
+    backgroundColor: Theme.colors.hairline,
+    marginBottom: Theme.spacing.sm,
+  },
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
+    width: '100%',
   },
-  backButton: {
-    padding: 4,
+  headerTitleCol: {
+    flex: 1,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+  sheetTitle: {
+    ...Theme.typography.titleMd,
+    color: Theme.colors.primary,
   },
+  sheetSubtitle: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginTop: 2,
+  },
+  closeBtn: {
+    padding: Theme.spacing.xs,
+    borderRadius: Theme.radii.sm,
+  },
+
+  /* Body Content */
   container: {
     flex: 1,
-    backgroundColor: Palette.background,
+    backgroundColor: Theme.colors.surface,
   },
   contentContainer: {
-    padding: 16,
+    padding: Theme.spacing.gutter,
+    gap: Theme.spacing.md,
   },
+
+  /* Form Cards */
   formCard: {
-    backgroundColor: Palette.white,
-    borderRadius: 14,
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 16,
-    marginBottom: 20,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.md,
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.md,
   },
-  label: {
-    fontSize: 13,
+  fieldGroup: {
+    gap: 6,
+  },
+  fieldLabel: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.onSurface,
     fontWeight: '600',
-    color: Palette.darkNavy,
-    marginBottom: 6,
-    marginTop: 10,
+    letterSpacing: 0.3,
   },
-  required: {
-    color: Palette.dangerRed,
+  requiredStar: {
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
   },
+
+  /* Name Input */
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.background,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.surfaceCard,
     borderWidth: 1,
-    borderColor: Palette.border,
-    paddingHorizontal: 12,
-    gap: 8,
-    marginBottom: 6,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    paddingHorizontal: Theme.spacing.md,
+    height: 48,
   },
-  rupeePrefix: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Palette.darkNavy,
+  inputIcon: {
+    marginRight: Theme.spacing.sm,
   },
-  input: {
+  textInput: {
     flex: 1,
-    paddingVertical: 11,
-    fontSize: 14,
-    color: Palette.textPrimary,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+    paddingVertical: 0,
   },
-  saveButton: {
-    backgroundColor: Palette.primaryBlue,
-    borderRadius: 12,
-    paddingVertical: 14,
+
+  /* Phone Input */
+  phoneInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surfaceCard,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    height: 48,
+    overflow: 'hidden',
+  },
+  countryCodeBox: {
+    backgroundColor: Theme.colors.surfaceContainer,
+    paddingHorizontal: 12,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: Theme.colors.hairline,
+  },
+  countryCodeText: {
+    ...Theme.typography.bodyMd,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+  },
+  phoneTextInput: {
+    flex: 1,
+    ...Theme.typography.bodyMd,
+    color: Theme.colors.onSurface,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: 0,
+  },
+
+  /* Opening Balance Toggle */
+  toggleRow: {
+    flexDirection: 'row',
+    gap: Theme.spacing.sm,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+  },
+  toggleBtnActive: {
+    backgroundColor: Theme.colors.moneyRedBg,
+    borderColor: Theme.colors.moneyRedBorder,
+  },
+  toggleBtnDisabled: {
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderColor: Theme.colors.hairline,
+    opacity: 0.65,
+  },
+  toggleTextActive: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+  toggleTextDisabled: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.outline,
+    fontWeight: '500',
+  },
+
+  /* Amount Input */
+  amountInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    paddingHorizontal: Theme.spacing.md,
+    height: 52,
+    gap: 8,
+  },
+  rupeeSymbol: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: Theme.colors.primary,
+  },
+  amountTextInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+    paddingVertical: 0,
+  },
+
+  /* Docked Bottom CTA Bar */
+  bottomDockedBar: {
+    backgroundColor: Theme.colors.surfaceCard,
+    borderTopWidth: 1,
+    borderTopColor: Theme.colors.hairline,
+    paddingHorizontal: Theme.spacing.gutter,
+    paddingVertical: Theme.spacing.md,
+  },
+  submitButton: {
+    backgroundColor: Theme.colors.primaryContainer,
+    borderRadius: Theme.radii.md,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
-  saveButtonDisabled: {
+  submitButtonDisabled: {
     opacity: 0.6,
   },
-  saveButtonText: {
-    color: Palette.white,
-    fontSize: 15,
+  submitButtonText: {
+    ...Theme.typography.bodyLg,
+    color: Theme.colors.onPrimary,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
