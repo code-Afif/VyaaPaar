@@ -270,6 +270,9 @@ export const hinglish: typeof en = {
 
   voice: {
     headerTitle: 'Kirana Voice Assistant',
+    sheetTitle: 'Bolo Khata',
+    demoBadge: 'DEMO',
+    sheetSubtitle: 'Aawaz se khata likhein (Simulated)',
     bannerTitle: 'Bolkar Udhaar ya Payment Likhein',
     bannerSub: 'Natural Hindi / Hinglish kirana commands',
     listeningActive: 'Listening... Bol rahe hain...',

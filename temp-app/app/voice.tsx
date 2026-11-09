@@ -205,12 +205,12 @@ export default function VoiceAssistantScreen() {
       <View style={styles.header}>
         <View style={styles.headerTitleCol}>
           <View style={styles.headerTitleRow}>
-            <Text style={styles.headerTitle}>Bolo Khata</Text>
+            <Text style={styles.headerTitle}>{t('voice.sheetTitle')}</Text>
             <View style={styles.demoPill}>
-              <Text style={styles.demoPillText}>DEMO</Text>
+              <Text style={styles.demoPillText}>{t('voice.demoBadge')}</Text>
             </View>
           </View>
-          <Text style={styles.headerSubtitle}>Aawaz se khata likhein (Simulated)</Text>
+          <Text style={styles.headerSubtitle}>{t('voice.sheetSubtitle')}</Text>
         </View>
         <Pressable
           onPress={() => router.back()}

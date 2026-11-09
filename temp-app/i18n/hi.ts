@@ -270,6 +270,9 @@ export const hi: typeof en = {
 
   voice: {
     headerTitle: 'किराना वॉयस सहायक',
+    sheetTitle: 'बोलो खाता',
+    demoBadge: 'डेमो',
+    sheetSubtitle: 'आवाज़ से खाता लिखें (सिम्युलेटेड)',
     bannerTitle: 'बोलकर उधार या जमा दर्ज करें',
     bannerSub: 'आसान हिंदी या हिंग्लिश में बोलें',
     listeningActive: 'सुन रहे हैं... बोलिए...',

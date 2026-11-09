@@ -268,6 +268,9 @@ export const en = {
 
   voice: {
     headerTitle: 'Kirana Voice Assistant',
+    sheetTitle: 'Bolo Khata',
+    demoBadge: 'DEMO',
+    sheetSubtitle: 'Record ledger by voice (Simulated)',
     bannerTitle: 'Speak to Record Credit or Payment',
     bannerSub: 'Natural Hindi / Hinglish kirana commands',
     listeningActive: 'Listening... Speaking...',
