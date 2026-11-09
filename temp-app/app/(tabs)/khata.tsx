@@ -7,7 +7,6 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,7 @@ import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { ScreenHeader, AmountText } from '@/components/ui';
-import { formatPaise, formatDisplayPhone } from '@/utils/format';
+import { formatDisplayPhone } from '@/utils/format';
 import { Customer } from '@/types';
 
 type FilterTab = 'ALL' | 'DUE' | 'SETTLED';

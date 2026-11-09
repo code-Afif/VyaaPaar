@@ -7,7 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AppProvider } from '@/context/AppContext';
 import { LanguageProvider, useLanguage } from '@/context/LanguageContext';
-import { Palette } from '@/constants/Colors';
+import { Theme } from '@/theme';
 
 export {
   ErrorBoundary,
@@ -23,11 +23,11 @@ const DukaanTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: Palette.primaryBlue,
-    background: Palette.background,
-    card: Palette.card,
-    text: Palette.textPrimary,
-    border: Palette.border,
+    primary: Theme.colors.primary,
+    background: Theme.colors.surface,
+    card: Theme.colors.surfaceCard,
+    text: Theme.colors.onSurface,
+    border: Theme.colors.hairline,
   },
 };
 
@@ -90,13 +90,6 @@ function RootNavigator() {
       />
       <Stack.Screen
         name="auth"
-        options={{
-          presentation: 'modal',
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="modal"
         options={{
           presentation: 'modal',
           headerShown: false,
