@@ -47,6 +47,9 @@ export default function CustomerDetailScreen() {
   const [modalType, setModalType] = useState<'CREDIT_SALE' | 'REPAYMENT' | null>(null);
   const [amountRupees, setAmountRupees] = useState('');
   const [description, setDescription] = useState('');
+  const [isSubmittingTx, setIsSubmittingTx] = useState(false);
+  const isSubmittingTxRef = useRef(false);
+  const idempotencyKeyRef = useRef('');
 
   // Reminder Modal state
   const [reminderModalVisible, setReminderModalVisible] = useState(false);
@@ -105,34 +108,54 @@ export default function CustomerDetailScreen() {
         ? t('home.descriptionCreditPlaceholder')
         : t('home.descriptionRepayPlaceholder')
     );
+    // Generate ONE idempotency key per modal open and reuse it for that entry
+    idempotencyKeyRef.current = `${type === 'CREDIT_SALE' ? 'sale' : 'repay'}-${customer.id}-${Date.now()}`;
+    isSubmittingTxRef.current = false;
+    setIsSubmittingTx(false);
   };
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
+    // Synchronous guard checked BEFORE the first await
+    if (isSubmittingTxRef.current) return;
+
     const rupees = parseFloat(amountRupees);
     if (isNaN(rupees) || rupees <= 0) {
       Alert.alert(t('home.amountRequiredTitle'), t('home.amountRequiredMsg'));
       return;
     }
 
-    const amountPaise = rupeesToPaise(rupees);
-    if (modalType === 'CREDIT_SALE') {
-      recordCreditSale(
-        customer.id,
-        amountPaise,
-        description || t('card.creditSaleType'),
-        'MANUAL'
-      );
-    } else {
-      recordRepayment(
-        customer.id,
-        amountPaise,
-        description || t('card.repaymentType'),
-        'MANUAL'
-      );
-    }
+    isSubmittingTxRef.current = true;
+    setIsSubmittingTx(true);
 
-    setModalType(null);
-    setAmountRupees('');
+    try {
+      const amountPaise = rupeesToPaise(rupees);
+      if (modalType === 'CREDIT_SALE') {
+        await recordCreditSale(
+          customer.id,
+          amountPaise,
+          description || t('card.creditSaleType'),
+          'MANUAL',
+          idempotencyKeyRef.current
+        );
+      } else {
+        await recordRepayment(
+          customer.id,
+          amountPaise,
+          description || t('card.repaymentType'),
+          'MANUAL',
+          undefined,
+          idempotencyKeyRef.current
+        );
+      }
+
+      setModalType(null);
+      setAmountRupees('');
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Failed to record transaction');
+    } finally {
+      isSubmittingTxRef.current = false;
+      setIsSubmittingTx(false);
+    }
   };
 
   const handleOpenReminder = () => {
@@ -495,15 +518,21 @@ export default function CustomerDetailScreen() {
                     modalType === 'CREDIT_SALE'
                       ? Theme.colors.moneyRed
                       : Theme.colors.moneyGreen,
+                  opacity: isSubmittingTx ? 0.6 : 1,
                 },
               ]}
+              disabled={isSubmittingTx}
               onPress={handleSaveTransaction}
             >
-              <Text style={styles.modalSubmitText}>
-                {modalType === 'CREDIT_SALE'
-                  ? t('customerDetail.confirmCreditBtn')
-                  : t('customerDetail.confirmRepayBtn')}
-              </Text>
+              {isSubmittingTx ? (
+                <ActivityIndicator size="small" color={Theme.colors.white} />
+              ) : (
+                <Text style={styles.modalSubmitText}>
+                  {modalType === 'CREDIT_SALE'
+                    ? t('customerDetail.confirmCreditBtn')
+                    : t('customerDetail.confirmRepayBtn')}
+                </Text>
+              )}
             </Pressable>
           </View>
         </KeyboardAvoidingView>

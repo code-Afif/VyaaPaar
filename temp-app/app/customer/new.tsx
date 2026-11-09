@@ -22,7 +22,7 @@ import { generateUUID } from '@/utils/uuid';
 
 export default function NewCustomerScreen() {
   const router = useRouter();
-  const { addCustomer } = useApp();
+  const { addCustomer, customers } = useApp();
   const { t } = useLanguage();
 
   const [name, setName] = useState('');
@@ -31,7 +31,7 @@ export default function NewCustomerScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
 
-  const handleSave = async () => {
+  const handleSave = async (forceCreate: boolean = false) => {
     // Synchronous guard checked BEFORE the first await
     if (isSubmittingRef.current) {
       return;
@@ -40,6 +40,40 @@ export default function NewCustomerScreen() {
     if (!name.trim()) {
       Alert.alert(t('customerNew.nameValidationTitle'), t('customerNew.nameValidationMsg'));
       return;
+    }
+
+    // Pre-check existing customers for duplicate name or phone before proceeding
+    if (!forceCreate) {
+      const cleanInputName = name.trim().toLowerCase();
+      const inputDigits = phone.replace(/\D/g, '').slice(-10);
+
+      const existingMatch = customers.find((c) => {
+        const cName = c.name.trim().toLowerCase();
+        if (cName === cleanInputName) return true;
+        if (inputDigits.length === 10 && c.phone) {
+          const cDigits = c.phone.replace(/\D/g, '').slice(-10);
+          if (cDigits && cDigits === inputDigits) return true;
+        }
+        return false;
+      });
+
+      if (existingMatch) {
+        Alert.alert(
+          'Yeh grahak pehle se hai',
+          `"${existingMatch.name}" ${existingMatch.phone ? `(${existingMatch.phone})` : ''} pehle se darj hai.`,
+          [
+            {
+              text: 'Existing Khata Kholein',
+              onPress: () => router.push(`/customer/${existingMatch.id}`),
+            },
+            {
+              text: 'Naya Banayein Phir Bhi',
+              onPress: () => handleSave(true),
+            },
+          ]
+        );
+        return;
+      }
     }
 
     isSubmittingRef.current = true;
@@ -190,7 +224,7 @@ export default function NewCustomerScreen() {
         <View style={styles.bottomDockedBar}>
           <Pressable
             style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-            onPress={handleSave}
+            onPress={() => handleSave(false)}
             disabled={isSubmitting}
             accessibilityLabel={t('customerNew.createBtn')}
           >

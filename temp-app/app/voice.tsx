@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { SEED_VOICE_COMMANDS } from '@/data/seedData';
 import { formatPaise, rupeesToPaise } from '@/utils/format';
+import { generateUUID } from '@/utils/uuid';
+import { Customer } from '@/types';
 
 interface ExtractedAction {
   intent: 'CREDIT_SALE' | 'REPAYMENT' | 'SEARCH_BALANCE' | 'DAILY_SUMMARY';
@@ -24,17 +27,23 @@ interface ExtractedAction {
   customerId?: string;
   amountRupees?: number;
   description?: string;
+  isNewCustomer?: boolean;
+  disambiguationCandidates?: Customer[];
 }
 
 export default function VoiceAssistantScreen() {
   const router = useRouter();
   const { t } = useLanguage();
-  const { customers, recordCreditSale, recordRepayment, briefing } = useApp();
+  const { customers, recordCreditSale, recordRepayment, addCustomer, briefing } = useApp();
 
   const [transcript, setTranscript] = useState(
     'Ramesh ko 300 rupaye ka samaan udhaar likh do'
   );
   const [isListening, setIsListening] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const voiceIdempotencyKeyRef = useRef(`voice-init-${Date.now()}`);
+
   const [proposedAction, setProposedAction] = useState<ExtractedAction | null>({
     intent: 'CREDIT_SALE',
     intentLabel: t('voice.intentCreditLabel'),
@@ -55,66 +64,143 @@ export default function VoiceAssistantScreen() {
     }, 1500);
   };
 
-  // Transcript parser strictly preserved
+  // Transcript parser matching case-insensitive and trimmed
   const analyzeTranscript = (text: string) => {
-    const lower = text.toLowerCase();
+    const cleanText = text.trim();
+    const lower = cleanText.toLowerCase();
+
+    // Match customer names: case-insensitive and trimmed
+    const findMatchingCustomers = (): Customer[] => {
+      if (!customers || customers.length === 0) return [];
+      return customers.filter((c) => {
+        const cleanName = c.name.trim().toLowerCase();
+        if (!cleanName) return false;
+        // 1. Exact full name appears in transcript
+        if (lower.includes(cleanName)) return true;
+        // 2. Word tokens (min 3 chars to avoid common Hindi particles)
+        const tokens = cleanName.split(/\s+/).filter((token) => token.length >= 3);
+        return tokens.some((token) => lower.includes(token));
+      });
+    };
+
+    // Extract spoken candidate name if no customer matched
+    const extractSpokenName = (): string => {
+      const match = cleanText.match(/^([A-Za-z\u0900-\u097F\s]+?)\s+(?:ko|se|ka|ne|ke)\b/i);
+      if (match && match[1].trim()) {
+        return match[1].trim();
+      }
+      const firstWord = cleanText.split(/\s+/)[0];
+      return firstWord || 'Naya Grahak';
+    };
 
     // 1. Credit Sale
     if (lower.includes('udhaar') || lower.includes('likh')) {
-      const cust = customers.find((c) =>
-        lower.includes(c.name.toLowerCase().split(' ')[0])
-      ) || customers[0];
-
+      const matched = findMatchingCustomers();
       const amountMatch = lower.match(/(\d+)/);
       const amount = amountMatch ? parseInt(amountMatch[0], 10) : 300;
+
+      let customerId: string | undefined;
+      let customerName: string | undefined;
+      let isNewCustomer = false;
+      let disambiguationCandidates: Customer[] | undefined;
+
+      if (matched.length === 1) {
+        customerId = matched[0].id;
+        customerName = matched[0].name;
+      } else if (matched.length > 1) {
+        disambiguationCandidates = matched;
+        customerId = undefined;
+        customerName = undefined;
+      } else {
+        isNewCustomer = true;
+        customerName = extractSpokenName();
+      }
+
+      voiceIdempotencyKeyRef.current = `voice-credit-${Date.now()}`;
 
       setProposedAction({
         intent: 'CREDIT_SALE',
         intentLabel: t('voice.intentCreditLabel'),
-        customerName: cust?.name,
-        customerId: cust?.id,
+        customerName,
+        customerId,
         amountRupees: amount,
         description: 'Kirana samaan / udhaar',
+        isNewCustomer,
+        disambiguationCandidates,
       });
       return;
     }
 
     // 2. Repayment
     if (lower.includes('lauta') || lower.includes('mila') || lower.includes('jama')) {
-      const cust = customers.find((c) =>
-        lower.includes(c.name.toLowerCase().split(' ')[0])
-      ) || customers[0];
-
+      const matched = findMatchingCustomers();
       const amountMatch = lower.match(/(\d+)/);
       const amount = amountMatch ? parseInt(amountMatch[0], 10) : 500;
+
+      let customerId: string | undefined;
+      let customerName: string | undefined;
+      let isNewCustomer = false;
+      let disambiguationCandidates: Customer[] | undefined;
+
+      if (matched.length === 1) {
+        customerId = matched[0].id;
+        customerName = matched[0].name;
+      } else if (matched.length > 1) {
+        disambiguationCandidates = matched;
+        customerId = undefined;
+        customerName = undefined;
+      } else {
+        isNewCustomer = true;
+        customerName = extractSpokenName();
+      }
+
+      voiceIdempotencyKeyRef.current = `voice-repay-${Date.now()}`;
 
       setProposedAction({
         intent: 'REPAYMENT',
         intentLabel: t('voice.intentRepayLabel'),
-        customerName: cust?.name,
-        customerId: cust?.id,
+        customerName,
+        customerId,
         amountRupees: amount,
         description: 'Repayment / cash settlement',
+        isNewCustomer,
+        disambiguationCandidates,
       });
       return;
     }
 
     // 3. Balance query
     if (lower.includes('baaki') || lower.includes('balance') || lower.includes('kitna')) {
-      const cust = customers.find((c) =>
-        lower.includes(c.name.toLowerCase().split(' ')[0])
-      ) || customers[1];
-
-      setProposedAction({
-        intent: 'SEARCH_BALANCE',
-        intentLabel: t('voice.intentBalanceLabel'),
-        customerName: cust?.name,
-        customerId: cust?.id,
-        description: t('voice.balanceDesc', {
-          name: cust?.name || '',
-          amount: formatPaise(cust?.currentBalancePaise || 0),
-        }),
-      });
+      const matched = findMatchingCustomers();
+      if (matched.length === 1) {
+        const cust = matched[0];
+        setProposedAction({
+          intent: 'SEARCH_BALANCE',
+          intentLabel: t('voice.intentBalanceLabel'),
+          customerName: cust.name,
+          customerId: cust.id,
+          description: t('voice.balanceDesc', {
+            name: cust.name || '',
+            amount: formatPaise(cust.currentBalancePaise || 0),
+          }),
+        });
+      } else if (matched.length > 1) {
+        setProposedAction({
+          intent: 'SEARCH_BALANCE',
+          intentLabel: t('voice.intentBalanceLabel'),
+          disambiguationCandidates: matched,
+          description: 'Multiple matching customers found. Please select below.',
+        });
+      } else {
+        const spoken = extractSpokenName();
+        setProposedAction({
+          intent: 'SEARCH_BALANCE',
+          intentLabel: t('voice.intentBalanceLabel'),
+          customerName: spoken,
+          isNewCustomer: true,
+          description: `"${spoken}" is not found in existing khata.`,
+        });
+      }
       return;
     }
 
@@ -134,65 +220,100 @@ export default function VoiceAssistantScreen() {
     analyzeTranscript(sampleText);
   };
 
-  // Human-in-the-loop confirmation handler strictly preserved
-  // Nothing written to ledger until explicit tap
-  const handleConfirmAction = () => {
+  // Human-in-the-loop confirmation handler with synchronous ref guard
+  const handleConfirmAction = async () => {
     if (!proposedAction) return;
 
-    if (proposedAction.intent === 'CREDIT_SALE' && proposedAction.customerId && proposedAction.amountRupees) {
-      const amountPaise = rupeesToPaise(proposedAction.amountRupees);
-      recordCreditSale(
-        proposedAction.customerId,
-        amountPaise,
-        proposedAction.description || 'Voice command credit sale',
-        'VOICE'
-      );
-
-      Alert.alert(
-        t('voice.alertSuccessTitle'),
-        t('voice.alertSuccessMsg', {
-          name: proposedAction.customerName || '',
-          amount: proposedAction.amountRupees,
-        }),
-        [
-          {
-            text: t('voice.viewKhataBtn'),
-            onPress: () => router.replace(`/customer/${proposedAction.customerId}`),
-          },
-        ]
-      );
+    // Disambiguation check: if several matched, ask which one before creating or recording
+    if (proposedAction.disambiguationCandidates && proposedAction.disambiguationCandidates.length > 1 && !proposedAction.customerId) {
+      Alert.alert('Grahak Chunein', 'Ek se zyada grahak match hue hain. Kripya card me se sahi grahak select karein.');
       return;
     }
 
-    if (proposedAction.intent === 'REPAYMENT' && proposedAction.customerId && proposedAction.amountRupees) {
-      const amountPaise = rupeesToPaise(proposedAction.amountRupees);
-      recordRepayment(
-        proposedAction.customerId,
-        amountPaise,
-        proposedAction.description || 'Voice command repayment',
-        'VOICE'
-      );
+    // Synchronous guard checked BEFORE the first await
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-      Alert.alert(
-        t('voice.alertRepayTitle'),
-        t('voice.alertRepayMsg', {
-          name: proposedAction.customerName || '',
-          amount: proposedAction.amountRupees,
-        }),
-        [
-          {
-            text: t('voice.viewKhataBtn'),
-            onPress: () => router.replace(`/customer/${proposedAction.customerId}`),
-          },
-        ]
-      );
-      return;
-    }
+    try {
+      let targetCustomerId = proposedAction.customerId;
+      let targetCustomerName = proposedAction.customerName || 'Customer';
 
-    if (proposedAction.customerId) {
-      router.replace(`/customer/${proposedAction.customerId}`);
-    } else {
-      router.back();
+      // If new customer notice, create customer first
+      if (proposedAction.isNewCustomer && !targetCustomerId) {
+        const newCust = await addCustomer(
+          targetCustomerName,
+          undefined,
+          0,
+          generateUUID()
+        );
+        targetCustomerId = newCust.id;
+        targetCustomerName = newCust.name;
+      }
+
+      if (proposedAction.intent === 'CREDIT_SALE' && targetCustomerId && proposedAction.amountRupees) {
+        const amountPaise = rupeesToPaise(proposedAction.amountRupees);
+        await recordCreditSale(
+          targetCustomerId,
+          amountPaise,
+          proposedAction.description || 'Voice command credit sale',
+          'VOICE',
+          voiceIdempotencyKeyRef.current
+        );
+
+        Alert.alert(
+          t('voice.alertSuccessTitle'),
+          t('voice.alertSuccessMsg', {
+            name: targetCustomerName,
+            amount: proposedAction.amountRupees,
+          }),
+          [
+            {
+              text: t('voice.viewKhataBtn'),
+              onPress: () => router.replace(`/customer/${targetCustomerId}`),
+            },
+          ]
+        );
+        return;
+      }
+
+      if (proposedAction.intent === 'REPAYMENT' && targetCustomerId && proposedAction.amountRupees) {
+        const amountPaise = rupeesToPaise(proposedAction.amountRupees);
+        await recordRepayment(
+          targetCustomerId,
+          amountPaise,
+          proposedAction.description || 'Voice command repayment',
+          'VOICE',
+          undefined,
+          voiceIdempotencyKeyRef.current
+        );
+
+        Alert.alert(
+          t('voice.alertRepayTitle'),
+          t('voice.alertRepayMsg', {
+            name: targetCustomerName,
+            amount: proposedAction.amountRupees,
+          }),
+          [
+            {
+              text: t('voice.viewKhataBtn'),
+              onPress: () => router.replace(`/customer/${targetCustomerId}`),
+            },
+          ]
+        );
+        return;
+      }
+
+      if (targetCustomerId) {
+        router.replace(`/customer/${targetCustomerId}`);
+      } else {
+        router.back();
+      }
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err?.message || 'Failed to record voice action');
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -292,16 +413,80 @@ export default function VoiceAssistantScreen() {
         {/* REVIEW CARD (PARSED EDITABLE FIELDS) */}
         {proposedAction && (
           <View style={styles.reviewCard}>
+            {/* Explicit Notice when No Existing Match: New Customer Will Be Created */}
+            {proposedAction.isNewCustomer && (
+              <View style={styles.newCustomerBanner}>
+                <Ionicons name="person-add" size={16} color={Theme.colors.secondary} />
+                <Text style={styles.newCustomerBannerText}>
+                  New customer will be created ({proposedAction.customerName || 'Naya Grahak'})
+                </Text>
+              </View>
+            )}
+
+            {/* Multiple matches: Ask which one instead of creating a new one */}
+            {proposedAction.disambiguationCandidates && proposedAction.disambiguationCandidates.length > 1 && (
+              <View style={styles.disambiguationSection}>
+                <Text style={styles.disambiguationHeading}>
+                  ⚠️ Ek se zyada grahak mile. Kripya chunein:
+                </Text>
+                <View style={styles.candidatesList}>
+                  {proposedAction.disambiguationCandidates.map((c) => {
+                    const isSelected = proposedAction.customerId === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        style={[
+                          styles.candidateCard,
+                          isSelected && styles.candidateCardSelected,
+                        ]}
+                        onPress={() => {
+                          setProposedAction((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  customerId: c.id,
+                                  customerName: c.name,
+                                }
+                              : null
+                          );
+                        }}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'checkmark-circle' : 'radio-button-off'}
+                          size={16}
+                          color={isSelected ? Theme.colors.primaryContainer : Theme.colors.outline}
+                        />
+                        <Text
+                          style={[
+                            styles.candidateName,
+                            isSelected && styles.candidateNameSelected,
+                          ]}
+                        >
+                          {c.name} {c.phone ? `(${c.phone})` : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
             {/* Field 1: Customer Details */}
             <View style={styles.fieldRow}>
               <View style={styles.fieldLeftCol}>
                 <Text style={styles.fieldSubLabel}>Grahak (Customer)</Text>
                 <Text style={styles.fieldNameText}>
-                  {proposedAction.customerName || 'Customer Not Selected'}
+                  {proposedAction.customerName || (proposedAction.disambiguationCandidates ? 'Kripya upar se grahak chunein' : 'Customer Not Selected')}
                 </Text>
-                <Text style={styles.fieldPhoneText}>
-                  {customers.find((c) => c.id === proposedAction.customerId)?.phone || '+91 98765 43210'}
-                </Text>
+                {proposedAction.isNewCustomer ? (
+                  <Text style={[styles.fieldPhoneText, { color: Theme.colors.secondary, fontWeight: '600' }]}>
+                    Naya grahak khata banega (No existing account)
+                  </Text>
+                ) : (
+                  <Text style={styles.fieldPhoneText}>
+                    {customers.find((c) => c.id === proposedAction.customerId)?.phone || (proposedAction.customerId ? '+91 98765 43210' : 'Upar diye vikalp se select karein')}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -402,10 +587,15 @@ export default function VoiceAssistantScreen() {
         {/* ACTION CTA BUTTONS */}
         <View style={styles.actionButtonGroup}>
           <Pressable
-            style={styles.confirmButton}
+            style={[styles.confirmButton, isSubmitting && { opacity: 0.6 }]}
+            disabled={isSubmitting}
             onPress={handleConfirmAction}
           >
-            <Text style={styles.confirmButtonText}>Confirm Karein</Text>
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={Theme.colors.onPrimary} />
+            ) : (
+              <Text style={styles.confirmButtonText}>Confirm Karein</Text>
+            )}
           </Pressable>
 
           <Pressable
@@ -597,6 +787,67 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Theme.colors.hairline,
     borderRadius: Theme.radii.sm,
+    overflow: 'hidden',
+  },
+  newCustomerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0F9FF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#BAE6FD',
+    padding: Theme.spacing.md,
+  },
+  newCustomerBannerText: {
+    ...Theme.typography.bodySm,
+    fontWeight: '700',
+    color: Theme.colors.secondary,
+    flex: 1,
+  },
+  disambiguationSection: {
+    padding: Theme.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceContainerLow,
+    gap: 8,
+  },
+  disambiguationHeading: {
+    ...Theme.typography.labelMd,
+    color: Theme.colors.moneyRed,
+    fontWeight: '700',
+  },
+  candidatesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  candidateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    backgroundColor: Theme.colors.surfaceCard,
+  },
+  candidateCardSelected: {
+    borderColor: Theme.colors.primaryContainer,
+    backgroundColor: '#EBF4FF',
+  },
+  candidateName: {
+    ...Theme.typography.bodySm,
+    fontWeight: '600',
+    color: Theme.colors.onSurface,
+  },
+  candidateNameSelected: {
+    color: Theme.colors.primaryContainer,
+    fontWeight: '700',
+  },
+  candidatePhone: {
+    fontSize: 11,
+    color: Theme.colors.onSurfaceVariant,
   },
   fieldRow: {
     padding: Theme.spacing.md,

@@ -64,14 +64,16 @@ interface AppContextType {
     customerId: string,
     amountPaise: number,
     description: string,
-    source?: TransactionSource
+    source?: TransactionSource,
+    idempotencyKey?: string
   ) => Promise<LedgerEntry>;
   recordRepayment: (
     customerId: string,
     amountPaise: number,
     description: string,
     source?: TransactionSource,
-    paymentEventId?: string
+    paymentEventId?: string,
+    idempotencyKey?: string
   ) => Promise<LedgerEntry>;
   reconcilePayment: (paymentEventId: string, customerId: string) => Promise<void>;
   simulateIncomingPayment: (amountPaise?: number, payerName?: string) => PaymentEvent;
@@ -393,11 +395,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     customerId: string,
     amountPaise: number,
     description: string,
-    source: TransactionSource = 'MANUAL'
+    source: TransactionSource = 'MANUAL',
+    customIdempotencyKey?: string
   ): Promise<LedgerEntry> => {
     const customer = customers.find((c) => c.id === customerId);
     const customerName = customer ? customer.name : 'Unknown Customer';
-    const idempotencyKey = `sale-${customerId}-${Date.now()}`;
+    const idempotencyKey = customIdempotencyKey || `sale-${customerId}-${Date.now()}`;
 
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
       await supabaseService.recordLedgerEntry({
@@ -449,11 +452,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     amountPaise: number,
     description: string,
     source: TransactionSource = 'MANUAL',
-    paymentEventId?: string
+    paymentEventId?: string,
+    customIdempotencyKey?: string
   ): Promise<LedgerEntry> => {
     const customer = customers.find((c) => c.id === customerId);
     const customerName = customer ? customer.name : 'Unknown Customer';
-    const idempotencyKey = `repay-${customerId}-${Date.now()}`;
+    const idempotencyKey = customIdempotencyKey || `repay-${customerId}-${Date.now()}`;
 
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
       await supabaseService.recordLedgerEntry({
