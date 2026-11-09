@@ -28,8 +28,11 @@ export default function InsightsScreen() {
     return inventory.filter((i) => i.isLowStock);
   }, [inventory]);
 
-  const overdueCustomers = useMemo(() => {
-    return customers.filter((c) => c.currentBalancePaise > 0);
+  // Sorted by highest pending balance (honest deterministic rule: currentBalancePaise descending)
+  const topDueCustomers = useMemo(() => {
+    return [...customers]
+      .filter((c) => c.currentBalancePaise > 0)
+      .sort((a, b) => b.currentBalancePaise - a.currentBalancePaise);
   }, [customers]);
 
   const unmatchedPayments = useMemo(() => {
@@ -70,7 +73,7 @@ export default function InsightsScreen() {
     });
   };
 
-  const topOverdueCustomer = overdueCustomers[0];
+  const topDueCustomer = topDueCustomers[0];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -115,7 +118,7 @@ export default function InsightsScreen() {
                 {formatPaise(briefing.totalOutstandingPaise)}
               </Text>
               <Text style={styles.heroColSub}>
-                {t('stitch.grahakCountUnit', { count: overdueCustomers.length })}
+                {t('stitch.grahakCountUnit', { count: topDueCustomers.length })}
               </Text>
             </View>
           </View>
@@ -136,41 +139,45 @@ export default function InsightsScreen() {
           <View style={styles.sectionHeaderBar}>
             <Text style={styles.sectionHeaderTitle}>
               {t('stitch.karyavahiAlerts', {
-                count: (topOverdueCustomer ? 1 : 0) + (unmatchedPayments.length > 0 ? 1 : 0),
+                count: (topDueCustomer ? 1 : 0) + (unmatchedPayments.length > 0 ? 1 : 0),
               })}
             </Text>
           </View>
 
-          {/* Row 1: Purana Udhaar Tagaada */}
-          {topOverdueCustomer ? (
+          {/* Row 1: Sabse Zyada Udhaar Baaki (Ranked deterministically by currentBalancePaise) */}
+          {topDueCustomer ? (
             <View style={styles.ledgerRow}>
               <View style={styles.rowTopBar}>
                 <View style={styles.rowTitleGroup}>
                   <View style={[styles.dotIndicator, { backgroundColor: Theme.colors.moneyRed }]} />
                   <Text style={styles.rowTitle}>
-                    {t('stitch.puranaUdhaarTagaadaTitle', { count: overdueCustomers.length })}
+                    {t('stitch.highestDueTitle', { count: topDueCustomers.length })}
                   </Text>
                 </View>
                 <View style={styles.badgePending}>
-                  <Text style={styles.badgePendingText}>Pending</Text>
+                  <Text style={styles.badgePendingText}>
+                    {t('stitch.highestDueBadge')}
+                  </Text>
                 </View>
               </View>
 
               <Text style={styles.rowDescription}>
-                {topOverdueCustomer.name} ka hisaab baaki hai (Kul {formatPaise(topOverdueCustomer.currentBalancePaise)}).
+                {topDueCustomer.name} ka hisaab baaki hai (Kul {formatPaise(topDueCustomer.currentBalancePaise)}).
               </Text>
 
               <View style={styles.rowFooterBar}>
                 <Pressable
                   style={styles.actionLink}
-                  onPress={() => handleSendReminder(topOverdueCustomer)}
+                  onPress={() => handleSendReminder(topDueCustomer)}
                   hitSlop={8}
                 >
                   <Text style={styles.actionLinkText}>{t('stitch.whatsappReminderBtn')}</Text>
                   <Ionicons name="paper-plane-outline" size={16} color={Theme.colors.primaryContainer} />
                 </Pressable>
                 <Text style={styles.rowMetaText}>
-                  {topOverdueCustomer.lastActivityDate || 'Haal hi me'}
+                  {topDueCustomer.lastActivityDate
+                    ? `Pichhla: ${topDueCustomer.lastActivityDate}`
+                    : 'Haal hi me'}
                 </Text>
               </View>
             </View>
@@ -183,7 +190,7 @@ export default function InsightsScreen() {
                 </View>
               </View>
               <Text style={styles.rowDescription}>
-                Kisi bhi grahak ka purana udhaar baaki nahi hai.
+                Kisi bhi grahak ka udhaar baaki nahi hai.
               </Text>
             </View>
           )}

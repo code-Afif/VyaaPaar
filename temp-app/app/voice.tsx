@@ -203,9 +203,14 @@ export default function VoiceAssistantScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* 56dp Top Sheet Bar: Title 'Bolo Khata', Subtext, and Dismiss '✕' */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Bolo Khata</Text>
-          <Text style={styles.headerSubtitle}>Aawaz se khata likhein</Text>
+        <View style={styles.headerTitleCol}>
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerTitle}>Bolo Khata</Text>
+            <View style={styles.demoPill}>
+              <Text style={styles.demoPillText}>DEMO</Text>
+            </View>
+          </View>
+          <Text style={styles.headerSubtitle}>Aawaz se khata likhein (Simulated)</Text>
         </View>
         <Pressable
           onPress={() => router.back()}
@@ -453,10 +458,32 @@ const styles = StyleSheet.create({
     borderBottomColor: Theme.colors.hairline,
     backgroundColor: Theme.colors.surfaceCard,
   },
+  headerTitleCol: {
+    gap: 2,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerTitle: {
     ...Theme.typography.titleMd,
     color: Theme.colors.primaryContainer,
     fontWeight: '700',
+  },
+  demoPill: {
+    backgroundColor: Theme.colors.surfaceContainer,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Theme.radii.sm,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+  },
+  demoPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Theme.colors.onSurfaceVariant,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
     ...Theme.typography.bodySm,

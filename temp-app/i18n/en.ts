@@ -108,6 +108,7 @@ export const en = {
 
   customerNew: {
     headerTitle: 'Add New Customer',
+    headerSubtitle: 'Add customer to shop ledger',
     nameLabel: 'Customer Name',
     nameRequired: '*',
     namePlaceholder: 'e.g. Mukesh Aggarwal',
@@ -464,6 +465,9 @@ export const en = {
     activeUdhaarBaaki: 'Active Udhaar Baaki',
     karyavahiAlerts: 'Karyavahi & Alerts ({count})',
     puranaUdhaarTagaadaTitle: 'Purana Udhaar Tagaada ({count} Grahak)',
+    highestDueTitle: 'Highest Balance Due ({count} Customers)',
+    highestDueBadge: 'Top Due',
+    highestDueRuleNote: 'Ranked by highest outstanding balance',
     whatsappReminderBtn: 'WhatsApp Reminder Bhejein',
     customerSeJodein: 'Customer Se Jodein',
     truthfulEmptyTitle: 'Zyada data aane par naye insights dikhenge',

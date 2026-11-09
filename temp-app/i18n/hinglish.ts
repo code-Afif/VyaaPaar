@@ -110,6 +110,7 @@ export const hinglish: typeof en = {
 
   customerNew: {
     headerTitle: 'Naya Grahak Jodein',
+    headerSubtitle: 'Dukaan bahi-khata me naya grahak jodein',
     nameLabel: 'Grahak Ka Naam',
     nameRequired: '*',
     namePlaceholder: 'e.g. Mukesh Aggarwal',
@@ -466,6 +467,9 @@ export const hinglish: typeof en = {
     activeUdhaarBaaki: 'Active Udhaar Baaki',
     karyavahiAlerts: 'Karyavahi & Alerts ({count})',
     puranaUdhaarTagaadaTitle: 'Purana Udhaar Tagaada ({count} Grahak)',
+    highestDueTitle: 'Sabse Zyada Udhaar Baaki ({count} Grahak)',
+    highestDueBadge: 'Top Due',
+    highestDueRuleNote: 'Sabse zyada baaki raqam ke anusaar',
     whatsappReminderBtn: 'WhatsApp Reminder Bhejein',
     customerSeJodein: 'Customer Se Jodein',
     truthfulEmptyTitle: 'Zyada data aane par naye insights dikhenge',

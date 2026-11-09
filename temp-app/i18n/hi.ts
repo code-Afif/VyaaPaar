@@ -110,6 +110,7 @@ export const hi: typeof en = {
 
   customerNew: {
     headerTitle: 'नया ग्राहक जोड़ें',
+    headerSubtitle: 'दुकान बही-खाता में नया ग्राहक जोड़ें',
     nameLabel: 'ग्राहक का नाम',
     nameRequired: '*',
     namePlaceholder: 'उदा. मुकेश अग्रवाल',
@@ -466,6 +467,9 @@ export const hi: typeof en = {
     activeUdhaarBaaki: 'कुल एक्टिव उधार बाकी',
     karyavahiAlerts: 'कार्रवाई और अलर्ट ({count})',
     puranaUdhaarTagaadaTitle: 'पुराना उधार तगादा ({count} ग्राहक)',
+    highestDueTitle: 'सबसे ज़्यादा उधार बाकी ({count} ग्राहक)',
+    highestDueBadge: 'बड़ा उधार',
+    highestDueRuleNote: 'सर्वाधिक बाकी रकम के आधार पर',
     whatsappReminderBtn: 'WhatsApp तगादा भेजें',
     customerSeJodein: 'ग्राहक से जोड़ें',
     truthfulEmptyTitle: 'ज़्यादा डेटा आने पर नए इनसाइट्स दिखेंगे',

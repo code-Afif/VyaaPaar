@@ -192,14 +192,9 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Brand Anchor Area */}
+          {/* Brand Title Area */}
           <View style={styles.brandAnchor}>
-            <View style={styles.trustBadge}>
-              <View style={styles.trustDot} />
-              <Text style={styles.trustBadgeText}>PRATISHTHA • VISHWAS</Text>
-            </View>
             <Text style={styles.mainTitle}>DukaanSaathi</Text>
-            <Text style={styles.mainSubtitle}>Aapka Digital Bahi-Khata</Text>
           </View>
 
           {/* Segmented Mode Selector */}
@@ -308,10 +303,7 @@ export default function AuthScreen() {
 
             {/* Email Field */}
             <View style={styles.fieldGroup}>
-              <View style={styles.fieldLabelRow}>
-                <Text style={styles.fieldLabel}>{t('auth.emailLabel')}</Text>
-                <Text style={styles.fieldHint}>Khatadhari ID</Text>
-              </View>
+              <Text style={styles.fieldLabel}>{t('auth.emailLabel')}</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="mail-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                 <TextInput
@@ -328,9 +320,7 @@ export default function AuthScreen() {
 
             {/* Password Field */}
             <View style={styles.fieldGroup}>
-              <View style={styles.fieldLabelRow}>
-                <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
-              </View>
+              <Text style={styles.fieldLabel}>{t('auth.passwordLabel')}</Text>
               <View style={styles.inputWrapper}>
                 <Ionicons name="lock-closed-outline" size={16} color={Theme.colors.onSurfaceVariant} />
                 <TextInput
@@ -372,17 +362,6 @@ export default function AuthScreen() {
             </Pressable>
           </View>
 
-          {/* Reassurance Info Card */}
-          <View style={styles.reassuranceCard}>
-            <Ionicons name="receipt-outline" size={20} color={Theme.colors.primaryContainer} />
-            <View style={styles.reassuranceTextCol}>
-              <Text style={styles.reassuranceTitle}>Rozana Hisaab-Kitab</Text>
-              <Text style={styles.reassuranceSub}>
-                Dukaan ka har ek udhaar aur jama ab ek jagah, 100% surakshit aur aasan.
-              </Text>
-            </View>
-          </View>
-
           {/* Demo Mode Button */}
           <View style={styles.demoSection}>
             <View style={styles.dividerRow}>
@@ -395,15 +374,6 @@ export default function AuthScreen() {
               <Ionicons name="play-circle-outline" size={18} color={Theme.colors.primaryContainer} />
               <Text style={styles.demoBtnText}>{t('auth.exploreDemo')}</Text>
             </Pressable>
-            <Text style={styles.demoNoteText}>{t('auth.demoDesc')}</Text>
-          </View>
-
-          {/* Grounded Security Footer */}
-          <View style={styles.securityFooter}>
-            <Ionicons name="lock-closed" size={14} color={Theme.colors.outline} />
-            <Text style={styles.securityFooterText}>
-              Aapka ledger data encrypted aur surakshit hai
-            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -476,41 +446,12 @@ const styles = StyleSheet.create({
   /* Brand Anchor */
   brandAnchor: {
     marginTop: 8,
-    gap: 6,
-  },
-  trustBadge: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: Theme.colors.hairline,
-    backgroundColor: Theme.colors.surfaceContainerLow,
-    borderRadius: Theme.radii.sm,
-  },
-  trustDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Theme.colors.primaryContainer,
-  },
-  trustBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Theme.colors.onSurfaceVariant,
-    letterSpacing: 0.5,
   },
   mainTitle: {
     fontSize: 26,
     fontWeight: '800',
     color: Theme.colors.primary,
     letterSpacing: -0.5,
-  },
-  mainSubtitle: {
-    ...Theme.typography.bodyMd,
-    color: Theme.colors.onSurfaceVariant,
   },
 
   /* Mode Tabs */
@@ -585,19 +526,10 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: 6,
   },
-  fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   fieldLabel: {
     ...Theme.typography.bodySm,
     fontWeight: '700',
     color: Theme.colors.onSurface,
-  },
-  fieldHint: {
-    fontSize: 10,
-    color: Theme.colors.outline,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -647,32 +579,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* Reassurance Card */
-  reassuranceCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: Theme.colors.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: Theme.colors.hairline,
-    borderRadius: Theme.radii.sm,
-    padding: Theme.spacing.md,
-  },
-  reassuranceTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  reassuranceTitle: {
-    ...Theme.typography.bodySm,
-    fontWeight: '700',
-    color: Theme.colors.onSurface,
-  },
-  reassuranceSub: {
-    ...Theme.typography.bodySm,
-    color: Theme.colors.onSurfaceVariant,
-    lineHeight: 18,
-  },
-
   /* Demo Mode Section */
   demoSection: {
     gap: 12,
@@ -706,23 +612,5 @@ const styles = StyleSheet.create({
     ...Theme.typography.labelMd,
     color: Theme.colors.primaryContainer,
     fontWeight: '700',
-  },
-  demoNoteText: {
-    ...Theme.typography.bodySm,
-    color: Theme.colors.onSurfaceVariant,
-    textAlign: 'center',
-  },
-
-  /* Grounded Security Footer */
-  securityFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-  },
-  securityFooterText: {
-    fontSize: 11,
-    color: Theme.colors.outline,
   },
 });

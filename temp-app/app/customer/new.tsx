@@ -84,9 +84,7 @@ export default function NewCustomerScreen() {
           <View style={styles.headerBar}>
             <View style={styles.headerTitleCol}>
               <Text style={styles.sheetTitle}>{t('customerNew.headerTitle')}</Text>
-              <Text style={styles.sheetSubtitle}>
-                {t('stitch.grahakSoochiHeader', { count: '' }).trim()} · Dukaan Bahi-Khata
-              </Text>
+              <Text style={styles.sheetSubtitle}>{t('customerNew.headerSubtitle')}</Text>
             </View>
             <Pressable
               onPress={() => router.back()}
