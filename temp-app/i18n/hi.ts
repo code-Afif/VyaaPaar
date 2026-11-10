@@ -131,7 +131,9 @@ export const hi: typeof en = {
     errorMsg: 'ग्राहक खाता बनाने में समस्या आई। कृपया पुनः प्रयास करें।',
     duplicateAlertTitle: 'यह ग्राहक पहले से मौजूद है',
     duplicateAlertMsg: '"{name}" {phone} पहले से आपके खाते में दर्ज है।',
+    duplicateMultipleMsg: 'आपके खाते में एक से ज़्यादा मिलते-जुलते ग्राहक मिले:',
     duplicateOpenExistingBtn: 'पुराना खाता खोलें',
+    duplicateOpenNamedBtn: 'खाता खोलें: {name}',
     duplicateCreateAnywayBtn: 'फिर भी नया बनाएं',
   },
 

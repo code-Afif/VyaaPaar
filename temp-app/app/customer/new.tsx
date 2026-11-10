@@ -46,7 +46,7 @@ export default function NewCustomerScreen() {
 
     // Pre-check existing customers for duplicate name or phone before proceeding
     if (!forceCreate) {
-      let matches: Array<{ id: string; name: string; phone?: string; currentBalancePaise?: number }> = [];
+      let matches: Array<{ id: string; name: string; phone?: string }> = [];
 
       // In real mode, query Supabase public.customers via read-only service method
       if (!merchant.isDemoMode && merchant.id) {
@@ -93,27 +93,42 @@ export default function NewCustomerScreen() {
                 name: matches[0].name,
                 phone: matches[0].phone ? `(${matches[0].phone})` : '',
               })
-            : `${matchLines}\n\n${t('customerNew.duplicateAlertTitle')}`;
+            : `${t('customerNew.duplicateMultipleMsg')}\n\n${matchLines}`;
+
+        const alertButtons: Array<{ text: string; onPress?: () => void }> = [];
+
+        if (matches.length === 1) {
+          alertButtons.push({
+            text: t('customerNew.duplicateOpenExistingBtn'),
+            onPress: () => {
+              isAlertOpenRef.current = false;
+              router.push(`/customer/${matches[0].id}`);
+            },
+          });
+        } else {
+          displayedMatches.forEach((m) => {
+            alertButtons.push({
+              text: t('customerNew.duplicateOpenNamedBtn', { name: m.name }),
+              onPress: () => {
+                isAlertOpenRef.current = false;
+                router.push(`/customer/${m.id}`);
+              },
+            });
+          });
+        }
+
+        alertButtons.push({
+          text: t('customerNew.duplicateCreateAnywayBtn'),
+          onPress: () => {
+            isAlertOpenRef.current = false;
+            handleSave(true);
+          },
+        });
 
         Alert.alert(
           t('customerNew.duplicateAlertTitle'),
           alertMessage,
-          [
-            {
-              text: t('customerNew.duplicateOpenExistingBtn'),
-              onPress: () => {
-                isAlertOpenRef.current = false;
-                router.push(`/customer/${displayedMatches[0].id}`);
-              },
-            },
-            {
-              text: t('customerNew.duplicateCreateAnywayBtn'),
-              onPress: () => {
-                isAlertOpenRef.current = false;
-                handleSave(true);
-              },
-            },
-          ],
+          alertButtons,
           {
             onDismiss: () => {
               isAlertOpenRef.current = false;
