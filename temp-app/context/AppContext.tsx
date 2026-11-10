@@ -184,8 +184,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           uniqueCusts.push(c);
         }
       }
+
+      // Deduplicate ledger entries by ID
+      const seenLedger = new Set<string>();
+      const uniqueLedger: LedgerEntry[] = [];
+      for (const l of dbLedger) {
+        if (!seenLedger.has(l.id)) {
+          seenLedger.add(l.id);
+          uniqueLedger.push(l);
+        }
+      }
+
       setCustomers(uniqueCusts);
-      setLedgerEntries(dbLedger);
+      setLedgerEntries(uniqueLedger);
       setPaymentEvents(dbPayments);
       setInventory(dbProducts);
 
@@ -403,7 +414,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const idempotencyKey = customIdempotencyKey || `sale-${customerId}-${Date.now()}`;
 
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
-      await supabaseService.recordLedgerEntry({
+      const entryId = await supabaseService.recordLedgerEntry({
         merchantId: merchant.id,
         customerId,
         entryType: 'credit_sale',
@@ -412,9 +423,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         source,
         idempotencyKey,
       });
+
+      if (entryId === 'idempotent-duplicate') {
+        // Idempotent duplicate: DB rejected duplicate insert via unique constraint
+        // Do NOT append any local entry and do NOT increment balance locally
+        const existing = ledgerEntries.find(
+          (l) => l.customerId === customerId && l.amountPaise === amountPaise
+        );
+        return (
+          existing || {
+            id: `dup-${idempotencyKey}`,
+            customerId,
+            customerName,
+            type: 'CREDIT_SALE',
+            amountPaise,
+            description: description.trim() || 'Credit sale',
+            createdAt: 'Just now',
+            createdAtIso: new Date().toISOString(),
+            source,
+            isSimulated: false,
+          }
+        );
+      }
+
+      // Authoritative DB refresh: refreshed data from Supabase already contains the entry
+      // and the correctly calculated customer balance.
       await refreshFromSupabase();
+
+      return {
+        id: entryId,
+        customerId,
+        customerName,
+        type: 'CREDIT_SALE',
+        amountPaise,
+        description: description.trim() || 'Credit sale',
+        createdAt: 'Just now',
+        createdAtIso: new Date().toISOString(),
+        source,
+        isSimulated: false,
+      };
     }
 
+    // Demo mode: local optimistic append & balance update
     const newEntry: LedgerEntry = {
       id: `led-${Date.now()}`,
       customerId,
@@ -425,7 +475,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: 'Today, Just now',
       createdAtIso: new Date().toISOString(),
       source,
-      isSimulated: isDemoMode,
+      isSimulated: true,
     };
 
     setLedgerEntries((prev) => [newEntry, ...prev]);
@@ -460,7 +510,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const idempotencyKey = customIdempotencyKey || `repay-${customerId}-${Date.now()}`;
 
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
-      await supabaseService.recordLedgerEntry({
+      const entryId = await supabaseService.recordLedgerEntry({
         merchantId: merchant.id,
         customerId,
         entryType: 'repayment',
@@ -469,9 +519,50 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         source,
         idempotencyKey,
       });
+
+      if (entryId === 'idempotent-duplicate') {
+        // Idempotent duplicate: DB rejected duplicate insert via unique constraint
+        // Do NOT append any local entry and do NOT increment balance locally
+        const existing = ledgerEntries.find(
+          (l) => l.customerId === customerId && l.amountPaise === amountPaise
+        );
+        return (
+          existing || {
+            id: `dup-${idempotencyKey}`,
+            customerId,
+            customerName,
+            type: 'REPAYMENT',
+            amountPaise,
+            description: description.trim() || 'Repayment',
+            createdAt: 'Just now',
+            createdAtIso: new Date().toISOString(),
+            source,
+            paymentEventId,
+            isSimulated: false,
+          }
+        );
+      }
+
+      // Authoritative DB refresh: refreshed data from Supabase already contains the entry
+      // and the correctly calculated customer balance.
       await refreshFromSupabase();
+
+      return {
+        id: entryId,
+        customerId,
+        customerName,
+        type: 'REPAYMENT',
+        amountPaise,
+        description: description.trim() || 'Repayment',
+        createdAt: 'Just now',
+        createdAtIso: new Date().toISOString(),
+        source,
+        paymentEventId,
+        isSimulated: false,
+      };
     }
 
+    // Demo mode: local optimistic append & balance update
     const newEntry: LedgerEntry = {
       id: `led-${Date.now()}`,
       customerId,
@@ -483,7 +574,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAtIso: new Date().toISOString(),
       source,
       paymentEventId,
-      isSimulated: isDemoMode,
+      isSimulated: true,
     };
 
     setLedgerEntries((prev) => [newEntry, ...prev]);

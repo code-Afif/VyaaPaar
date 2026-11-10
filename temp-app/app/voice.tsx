@@ -43,6 +43,7 @@ export default function VoiceAssistantScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const voiceIdempotencyKeyRef = useRef(`voice-init-${Date.now()}`);
+  const newCustomerUuidRef = useRef<string>(generateUUID());
 
   const [proposedAction, setProposedAction] = useState<ExtractedAction | null>({
     intent: 'CREDIT_SALE',
@@ -69,17 +70,29 @@ export default function VoiceAssistantScreen() {
     const cleanText = text.trim();
     const lower = cleanText.toLowerCase();
 
-    // Match customer names: case-insensitive and trimmed
+    const escapeRegex = (s: string) => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const words = cleanText
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0900-\u097F\s]/gi, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    const transcriptWords = new Set(words);
+
+    // Match customer names: whole-word matches only (split transcript into words)
     const findMatchingCustomers = (): Customer[] => {
       if (!customers || customers.length === 0) return [];
       return customers.filter((c) => {
         const cleanName = c.name.trim().toLowerCase();
         if (!cleanName) return false;
-        // 1. Exact full name appears in transcript
-        if (lower.includes(cleanName)) return true;
-        // 2. Word tokens (min 3 chars to avoid common Hindi particles)
-        const tokens = cleanName.split(/\s+/).filter((token) => token.length >= 3);
-        return tokens.some((token) => lower.includes(token));
+        // 1. Exact full name match as whole phrase bounded by spaces or start/end
+        const fullNameRegex = new RegExp(`(^|\\s)${escapeRegex(cleanName)}(\\s|$)`, 'i');
+        if (fullNameRegex.test(cleanText)) return true;
+        // 2. Whole-word token match from transcript word set (tokens >= 2 chars)
+        const nameTokens = cleanName
+          .replace(/[^a-z0-9\u0900-\u097F\s]/gi, ' ')
+          .split(/\s+/)
+          .filter((token) => token.length >= 2);
+        return nameTokens.some((token) => transcriptWords.has(token));
       });
     };
 
@@ -90,7 +103,7 @@ export default function VoiceAssistantScreen() {
         return match[1].trim();
       }
       const firstWord = cleanText.split(/\s+/)[0];
-      return firstWord || 'Naya Grahak';
+      return firstWord || t('voice.defaultNewCustomerName');
     };
 
     // 1. Credit Sale
@@ -114,6 +127,7 @@ export default function VoiceAssistantScreen() {
       } else {
         isNewCustomer = true;
         customerName = extractSpokenName();
+        newCustomerUuidRef.current = generateUUID();
       }
 
       voiceIdempotencyKeyRef.current = `voice-credit-${Date.now()}`;
@@ -152,6 +166,7 @@ export default function VoiceAssistantScreen() {
       } else {
         isNewCustomer = true;
         customerName = extractSpokenName();
+        newCustomerUuidRef.current = generateUUID();
       }
 
       voiceIdempotencyKeyRef.current = `voice-repay-${Date.now()}`;
@@ -193,6 +208,7 @@ export default function VoiceAssistantScreen() {
         });
       } else {
         const spoken = extractSpokenName();
+        newCustomerUuidRef.current = generateUUID();
         setProposedAction({
           intent: 'SEARCH_BALANCE',
           intentLabel: t('voice.intentBalanceLabel'),
@@ -226,7 +242,7 @@ export default function VoiceAssistantScreen() {
 
     // Disambiguation check: if several matched, ask which one before creating or recording
     if (proposedAction.disambiguationCandidates && proposedAction.disambiguationCandidates.length > 1 && !proposedAction.customerId) {
-      Alert.alert('Grahak Chunein', 'Ek se zyada grahak match hue hain. Kripya card me se sahi grahak select karein.');
+      Alert.alert(t('voice.selectCustomerTitle'), t('voice.selectCustomerMsg'));
       return;
     }
 
@@ -237,18 +253,25 @@ export default function VoiceAssistantScreen() {
 
     try {
       let targetCustomerId = proposedAction.customerId;
-      let targetCustomerName = proposedAction.customerName || 'Customer';
+      let targetCustomerName = (proposedAction.customerName && proposedAction.customerName.trim()) || t('voice.defaultNewCustomerName');
 
-      // If new customer notice, create customer first
+      // If new customer notice, create customer first (reuse UUID on retry, skip if already exists)
       if (proposedAction.isNewCustomer && !targetCustomerId) {
-        const newCust = await addCustomer(
-          targetCustomerName,
-          undefined,
-          0,
-          generateUUID()
-        );
-        targetCustomerId = newCust.id;
-        targetCustomerName = newCust.name;
+        const candidateId = newCustomerUuidRef.current;
+        const existing = customers.find((c) => c.id === candidateId);
+        if (existing) {
+          targetCustomerId = existing.id;
+          targetCustomerName = existing.name;
+        } else {
+          const newCust = await addCustomer(
+            targetCustomerName,
+            undefined,
+            0,
+            candidateId
+          );
+          targetCustomerId = newCust.id;
+          targetCustomerName = newCust.name;
+        }
       }
 
       if (proposedAction.intent === 'CREDIT_SALE' && targetCustomerId && proposedAction.amountRupees) {
@@ -322,7 +345,7 @@ export default function VoiceAssistantScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* 56dp Top Sheet Bar: Title 'Bolo Khata', Subtext, and Dismiss '✕' */}
+      {/* 56dp Top Sheet Bar: Title 'Bolo Khata', Subtext, and Dismiss Button */}
       <View style={styles.header}>
         <View style={styles.headerTitleCol}>
           <View style={styles.headerTitleRow}>
@@ -418,7 +441,9 @@ export default function VoiceAssistantScreen() {
               <View style={styles.newCustomerBanner}>
                 <Ionicons name="person-add" size={16} color={Theme.colors.secondary} />
                 <Text style={styles.newCustomerBannerText}>
-                  New customer will be created ({proposedAction.customerName || 'Naya Grahak'})
+                  {t('voice.newCustomerNoticeTitle', {
+                    name: proposedAction.customerName || t('voice.defaultNewCustomerName'),
+                  })}
                 </Text>
               </View>
             )}
@@ -427,7 +452,7 @@ export default function VoiceAssistantScreen() {
             {proposedAction.disambiguationCandidates && proposedAction.disambiguationCandidates.length > 1 && (
               <View style={styles.disambiguationSection}>
                 <Text style={styles.disambiguationHeading}>
-                  ⚠️ Ek se zyada grahak mile. Kripya chunein:
+                  {t('voice.disambiguationPrompt')}
                 </Text>
                 <View style={styles.candidatesList}>
                   {proposedAction.disambiguationCandidates.map((c) => {
@@ -474,18 +499,36 @@ export default function VoiceAssistantScreen() {
             {/* Field 1: Customer Details */}
             <View style={styles.fieldRow}>
               <View style={styles.fieldLeftCol}>
-                <Text style={styles.fieldSubLabel}>Grahak (Customer)</Text>
-                <Text style={styles.fieldNameText}>
-                  {proposedAction.customerName || (proposedAction.disambiguationCandidates ? 'Kripya upar se grahak chunein' : 'Customer Not Selected')}
-                </Text>
+                <Text style={styles.fieldSubLabel}>{t('voice.customerLabel')}</Text>
                 {proposedAction.isNewCustomer ? (
-                  <Text style={[styles.fieldPhoneText, { color: Theme.colors.secondary, fontWeight: '600' }]}>
-                    Naya grahak khata banega (No existing account)
-                  </Text>
+                  <View style={styles.newCustomerInputWrapper}>
+                    <Text style={styles.newCustomerInputLabel}>
+                      {t('voice.newCustomerNameLabel')}
+                    </Text>
+                    <TextInput
+                      style={styles.newCustomerNameInput}
+                      value={proposedAction.customerName || ''}
+                      onChangeText={(val) => {
+                        setProposedAction((prev) =>
+                          prev ? { ...prev, customerName: val } : null
+                        );
+                      }}
+                      placeholder={t('voice.newCustomerNamePlaceholder')}
+                      placeholderTextColor={Theme.colors.outline}
+                    />
+                    <Text style={[styles.fieldPhoneText, { color: Theme.colors.secondary, fontWeight: '600' }]}>
+                      {t('voice.newCustomerFieldSub')}
+                    </Text>
+                  </View>
                 ) : (
-                  <Text style={styles.fieldPhoneText}>
-                    {customers.find((c) => c.id === proposedAction.customerId)?.phone || (proposedAction.customerId ? '+91 98765 43210' : 'Upar diye vikalp se select karein')}
-                  </Text>
+                  <>
+                    <Text style={styles.fieldNameText}>
+                      {proposedAction.customerName || (proposedAction.disambiguationCandidates ? t('voice.selectCustomerPlaceholder') : 'Customer Not Selected')}
+                    </Text>
+                    <Text style={styles.fieldPhoneText}>
+                      {customers.find((c) => c.id === proposedAction.customerId)?.phone || (proposedAction.customerId ? '+91 98765 43210' : t('voice.disambiguationPrompt'))}
+                    </Text>
+                  </>
                 )}
               </View>
             </View>
@@ -859,6 +902,26 @@ const styles = StyleSheet.create({
   },
   fieldLeftCol: {
     gap: 2,
+  },
+  newCustomerInputWrapper: {
+    gap: 4,
+    marginTop: 2,
+  },
+  newCustomerInputLabel: {
+    ...Theme.typography.bodySm,
+    color: Theme.colors.onSurfaceVariant,
+    marginBottom: 2,
+  },
+  newCustomerNameInput: {
+    ...Theme.typography.bodyLg,
+    fontWeight: '700',
+    color: Theme.colors.onSurface,
+    borderWidth: 1,
+    borderColor: Theme.colors.hairline,
+    borderRadius: Theme.radii.sm,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: Theme.colors.surfaceContainerLow,
   },
   fieldSubLabel: {
     ...Theme.typography.labelMd,

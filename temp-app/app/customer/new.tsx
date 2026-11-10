@@ -30,6 +30,7 @@ export default function NewCustomerScreen() {
   const [openingBalance, setOpeningBalance] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const isAlertOpenRef = useRef(false);
 
   const handleSave = async (forceCreate: boolean = false) => {
     // Synchronous guard checked BEFORE the first await
@@ -58,19 +59,36 @@ export default function NewCustomerScreen() {
       });
 
       if (existingMatch) {
+        if (isAlertOpenRef.current) return;
+        isAlertOpenRef.current = true;
+
         Alert.alert(
-          'Yeh grahak pehle se hai',
-          `"${existingMatch.name}" ${existingMatch.phone ? `(${existingMatch.phone})` : ''} pehle se darj hai.`,
+          t('customerNew.duplicateAlertTitle'),
+          t('customerNew.duplicateAlertMsg', {
+            name: existingMatch.name,
+            phone: existingMatch.phone ? `(${existingMatch.phone})` : '',
+          }),
           [
             {
-              text: 'Existing Khata Kholein',
-              onPress: () => router.push(`/customer/${existingMatch.id}`),
+              text: t('customerNew.duplicateOpenExistingBtn'),
+              onPress: () => {
+                isAlertOpenRef.current = false;
+                router.push(`/customer/${existingMatch.id}`);
+              },
             },
             {
-              text: 'Naya Banayein Phir Bhi',
-              onPress: () => handleSave(true),
+              text: t('customerNew.duplicateCreateAnywayBtn'),
+              onPress: () => {
+                isAlertOpenRef.current = false;
+                handleSave(true);
+              },
             },
-          ]
+          ],
+          {
+            onDismiss: () => {
+              isAlertOpenRef.current = false;
+            },
+          }
         );
         return;
       }
