@@ -132,6 +132,7 @@ export const hi: typeof en = {
     duplicateAlertTitle: 'यह ग्राहक पहले से मौजूद है',
     duplicateAlertMsg: '"{name}" {phone} पहले से आपके खाते में दर्ज है।',
     duplicateMultipleMsg: 'आपके खाते में एक से ज़्यादा मिलते-जुलते ग्राहक मिले:',
+    duplicateMaxButtonsNotice: 'सूचना: यहाँ से केवल पहले 2 खातों को सीधे खोला जा सकता है।',
     duplicateOpenExistingBtn: 'पुराना खाता खोलें',
     duplicateOpenNamedBtn: 'खाता खोलें: {name}',
     duplicateCreateAnywayBtn: 'फिर भी नया बनाएं',

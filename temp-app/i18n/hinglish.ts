@@ -132,6 +132,7 @@ export const hinglish: typeof en = {
     duplicateAlertTitle: 'Yeh grahak pehle se hai',
     duplicateAlertMsg: '"{name}" {phone} pehle se darj hai.',
     duplicateMultipleMsg: 'Aapke khate me ek se zyada milte-julte grahak mile:',
+    duplicateMaxButtonsNotice: 'Note: Yahan se sirf pehle 2 khate direct khole ja sakte hain.',
     duplicateOpenExistingBtn: 'Existing Khata Kholein',
     duplicateOpenNamedBtn: 'Khata Kholein: {name}',
     duplicateCreateAnywayBtn: 'Naya Banayein Phir Bhi',

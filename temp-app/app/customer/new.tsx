@@ -34,15 +34,17 @@ export default function NewCustomerScreen() {
   const isAlertOpenRef = useRef(false);
 
   const handleSave = async (forceCreate: boolean = false) => {
-    // Synchronous guard checked BEFORE the first await
-    if (isSubmittingRef.current) {
-      return;
-    }
-
     if (!name.trim()) {
       Alert.alert(t('customerNew.nameValidationTitle'), t('customerNew.nameValidationMsg'));
       return;
     }
+
+    // Synchronous guard checked and acquired BEFORE any await
+    if (isSubmittingRef.current) {
+      return;
+    }
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     // Pre-check existing customers for duplicate name or phone before proceeding
     if (!forceCreate) {
@@ -79,21 +81,28 @@ export default function NewCustomerScreen() {
       }
 
       if (matches.length > 0) {
+        // Release guard on early exit when duplicate alert is shown
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+
         if (isAlertOpenRef.current) return;
         isAlertOpenRef.current = true;
 
-        const displayedMatches = matches.slice(0, 3);
-        const matchLines = displayedMatches
+        const allMatchLines = matches
           .map((m) => `• ${m.name}${m.phone ? ` (${m.phone})` : ''}`)
           .join('\n');
 
-        const alertMessage =
-          matches.length === 1
-            ? t('customerNew.duplicateAlertMsg', {
-                name: matches[0].name,
-                phone: matches[0].phone ? `(${matches[0].phone})` : '',
-              })
-            : `${t('customerNew.duplicateMultipleMsg')}\n\n${matchLines}`;
+        let alertMessage: string;
+        if (matches.length === 1) {
+          alertMessage = t('customerNew.duplicateAlertMsg', {
+            name: matches[0].name,
+            phone: matches[0].phone ? `(${matches[0].phone})` : '',
+          });
+        } else if (matches.length === 2) {
+          alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}`;
+        } else {
+          alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}\n\n${t('customerNew.duplicateMaxButtonsNotice')}`;
+        }
 
         const alertButtons: Array<{ text: string; onPress?: () => void }> = [];
 
@@ -102,25 +111,33 @@ export default function NewCustomerScreen() {
             text: t('customerNew.duplicateOpenExistingBtn'),
             onPress: () => {
               isAlertOpenRef.current = false;
+              isSubmittingRef.current = false;
+              setIsSubmitting(false);
               router.push(`/customer/${matches[0].id}`);
             },
           });
         } else {
-          displayedMatches.forEach((m) => {
+          // Show at most 2 named "open khata" buttons
+          matches.slice(0, 2).forEach((m) => {
             alertButtons.push({
               text: t('customerNew.duplicateOpenNamedBtn', { name: m.name }),
               onPress: () => {
                 isAlertOpenRef.current = false;
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
                 router.push(`/customer/${m.id}`);
               },
             });
           });
         }
 
+        // Plus "Naya Banayein Phir Bhi" button
         alertButtons.push({
           text: t('customerNew.duplicateCreateAnywayBtn'),
           onPress: () => {
             isAlertOpenRef.current = false;
+            isSubmittingRef.current = false;
+            setIsSubmitting(false);
             handleSave(true);
           },
         });
@@ -132,15 +149,14 @@ export default function NewCustomerScreen() {
           {
             onDismiss: () => {
               isAlertOpenRef.current = false;
+              isSubmittingRef.current = false;
+              setIsSubmitting(false);
             },
           }
         );
         return;
       }
     }
-
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
 
     // Generate ONE operation / customer ID (random UUID) per intentional submit attempt
     const operationCustomerId = generateUUID();
