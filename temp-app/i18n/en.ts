@@ -317,6 +317,7 @@ export const en = {
     defaultNewCustomerName: 'New Customer',
     newCustomerNamePlaceholder: 'Customer Name',
     newCustomerNameLabel: 'New Customer Name',
+    customerNotSelected: 'Customer not selected',
   },
 
   auth: {

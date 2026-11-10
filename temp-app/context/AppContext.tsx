@@ -427,23 +427,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (entryId === 'idempotent-duplicate') {
         // Idempotent duplicate: DB rejected duplicate insert via unique constraint
         // Do NOT append any local entry and do NOT increment balance locally
-        const existing = ledgerEntries.find(
-          (l) => l.customerId === customerId && l.amountPaise === amountPaise
-        );
-        return (
-          existing || {
-            id: `dup-${idempotencyKey}`,
-            customerId,
-            customerName,
-            type: 'CREDIT_SALE',
-            amountPaise,
-            description: description.trim() || 'Credit sale',
-            createdAt: 'Just now',
-            createdAtIso: new Date().toISOString(),
-            source,
-            isSimulated: false,
-          }
-        );
+        return {
+          id: `dup-${idempotencyKey}`,
+          customerId,
+          customerName,
+          type: 'CREDIT_SALE',
+          amountPaise,
+          description: description.trim() || 'Credit sale',
+          createdAt: 'Just now',
+          createdAtIso: new Date().toISOString(),
+          source,
+          isSimulated: false,
+        };
       }
 
       // Authoritative DB refresh: refreshed data from Supabase already contains the entry
@@ -523,24 +518,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (entryId === 'idempotent-duplicate') {
         // Idempotent duplicate: DB rejected duplicate insert via unique constraint
         // Do NOT append any local entry and do NOT increment balance locally
-        const existing = ledgerEntries.find(
-          (l) => l.customerId === customerId && l.amountPaise === amountPaise
-        );
-        return (
-          existing || {
-            id: `dup-${idempotencyKey}`,
-            customerId,
-            customerName,
-            type: 'REPAYMENT',
-            amountPaise,
-            description: description.trim() || 'Repayment',
-            createdAt: 'Just now',
-            createdAtIso: new Date().toISOString(),
-            source,
-            paymentEventId,
-            isSimulated: false,
-          }
-        );
+        return {
+          id: `dup-${idempotencyKey}`,
+          customerId,
+          customerName,
+          type: 'REPAYMENT',
+          amountPaise,
+          description: description.trim() || 'Repayment',
+          createdAt: 'Just now',
+          createdAtIso: new Date().toISOString(),
+          source,
+          paymentEventId,
+          isSimulated: false,
+        };
       }
 
       // Authoritative DB refresh: refreshed data from Supabase already contains the entry

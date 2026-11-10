@@ -319,6 +319,7 @@ export const hi: typeof en = {
     defaultNewCustomerName: 'नया ग्राहक',
     newCustomerNamePlaceholder: 'ग्राहक का नाम',
     newCustomerNameLabel: 'नए ग्राहक का नाम',
+    customerNotSelected: 'ग्राहक चुना नहीं गया',
   },
 
   auth: {

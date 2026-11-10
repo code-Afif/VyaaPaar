@@ -319,6 +319,7 @@ export const hinglish: typeof en = {
     defaultNewCustomerName: 'Naya Grahak',
     newCustomerNamePlaceholder: 'Grahak ka naam',
     newCustomerNameLabel: 'Naye Grahak Ka Naam',
+    customerNotSelected: 'Grahak select nahi kiya',
   },
 
   auth: {

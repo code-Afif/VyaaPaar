@@ -523,11 +523,20 @@ export default function VoiceAssistantScreen() {
                 ) : (
                   <>
                     <Text style={styles.fieldNameText}>
-                      {proposedAction.customerName || (proposedAction.disambiguationCandidates ? t('voice.selectCustomerPlaceholder') : 'Customer Not Selected')}
+                      {proposedAction.customerName ||
+                        (proposedAction.disambiguationCandidates
+                          ? t('voice.selectCustomerPlaceholder')
+                          : t('voice.customerNotSelected'))}
                     </Text>
-                    <Text style={styles.fieldPhoneText}>
-                      {customers.find((c) => c.id === proposedAction.customerId)?.phone || (proposedAction.customerId ? '+91 98765 43210' : t('voice.disambiguationPrompt'))}
-                    </Text>
+                    {customers.find((c) => c.id === proposedAction.customerId)?.phone ? (
+                      <Text style={styles.fieldPhoneText}>
+                        {customers.find((c) => c.id === proposedAction.customerId)?.phone}
+                      </Text>
+                    ) : proposedAction.disambiguationCandidates && !proposedAction.customerId ? (
+                      <Text style={styles.fieldPhoneText}>
+                        {t('voice.disambiguationPrompt')}
+                      </Text>
+                    ) : null}
                   </>
                 )}
               </View>
