@@ -46,122 +46,122 @@ export default function NewCustomerScreen() {
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
-    // Pre-check existing customers for duplicate name or phone before proceeding
-    if (!forceCreate) {
-      let matches: Array<{ id: string; name: string; phone?: string }> = [];
+    try {
+      // Pre-check existing customers for duplicate name or phone before proceeding
+      if (!forceCreate) {
+        let matches: Array<{ id: string; name: string; phone?: string }> = [];
 
-      // In real mode, query Supabase public.customers via read-only service method
-      if (!merchant.isDemoMode && merchant.id) {
-        try {
-          matches = await supabaseService.findPossibleDuplicates(merchant.id, name, phone);
-        } catch (err) {
-          console.warn('[customer/new] Duplicate check in Supabase failed, falling back to local list:', err);
-          matches = [];
-        }
-      }
-
-      // In demo mode, or as fallback if the service call failed or returned empty:
-      if (matches.length === 0) {
-        const cleanInputName = name.trim().toLowerCase();
-        const inputDigits = phone.replace(/\D/g, '').slice(-10);
-
-        const localMatches = customers.filter((c) => {
-          const cName = c.name.trim().toLowerCase();
-          if (cleanInputName && cName === cleanInputName) return true;
-          if (inputDigits.length === 10 && c.phone) {
-            const cDigits = c.phone.replace(/\D/g, '').slice(-10);
-            if (cDigits && cDigits === inputDigits) return true;
+        // In real mode, query Supabase public.customers via read-only service method
+        if (!merchant.isDemoMode && merchant.id) {
+          try {
+            matches = await supabaseService.findPossibleDuplicates(merchant.id, name, phone);
+          } catch (err) {
+            console.warn('[customer/new] Duplicate check in Supabase failed, falling back to local list:', err);
+            matches = [];
           }
-          return false;
-        });
-
-        if (localMatches.length > 0) {
-          matches = localMatches;
-        }
-      }
-
-      if (matches.length > 0) {
-        // Release guard on early exit when duplicate alert is shown
-        isSubmittingRef.current = false;
-        setIsSubmitting(false);
-
-        if (isAlertOpenRef.current) return;
-        isAlertOpenRef.current = true;
-
-        const allMatchLines = matches
-          .map((m) => `• ${m.name}${m.phone ? ` (${m.phone})` : ''}`)
-          .join('\n');
-
-        let alertMessage: string;
-        if (matches.length === 1) {
-          alertMessage = t('customerNew.duplicateAlertMsg', {
-            name: matches[0].name,
-            phone: matches[0].phone ? `(${matches[0].phone})` : '',
-          });
-        } else if (matches.length === 2) {
-          alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}`;
-        } else {
-          alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}\n\n${t('customerNew.duplicateMaxButtonsNotice')}`;
         }
 
-        const alertButtons: Array<{ text: string; onPress?: () => void }> = [];
+        // In demo mode, or as fallback if the service call failed or returned empty:
+        if (matches.length === 0) {
+          const cleanInputName = name.trim().toLowerCase();
+          const inputDigits = phone.replace(/\D/g, '').slice(-10);
 
-        if (matches.length === 1) {
-          alertButtons.push({
-            text: t('customerNew.duplicateOpenExistingBtn'),
-            onPress: () => {
-              isAlertOpenRef.current = false;
-              isSubmittingRef.current = false;
-              setIsSubmitting(false);
-              router.push(`/customer/${matches[0].id}`);
-            },
+          const localMatches = customers.filter((c) => {
+            const cName = c.name.trim().toLowerCase();
+            if (cleanInputName && cName === cleanInputName) return true;
+            if (inputDigits.length === 10 && c.phone) {
+              const cDigits = c.phone.replace(/\D/g, '').slice(-10);
+              if (cDigits && cDigits === inputDigits) return true;
+            }
+            return false;
           });
-        } else {
-          // Show at most 2 named "open khata" buttons
-          matches.slice(0, 2).forEach((m) => {
+
+          if (localMatches.length > 0) {
+            matches = localMatches;
+          }
+        }
+
+        if (matches.length > 0) {
+          // Release guard on early exit when duplicate alert is shown
+          isSubmittingRef.current = false;
+          setIsSubmitting(false);
+
+          if (isAlertOpenRef.current) return;
+          isAlertOpenRef.current = true;
+
+          const allMatchLines = matches
+            .map((m) => `• ${m.name}${m.phone ? ` (${m.phone})` : ''}`)
+            .join('\n');
+
+          let alertMessage: string;
+          if (matches.length === 1) {
+            alertMessage = t('customerNew.duplicateAlertMsg', {
+              name: matches[0].name,
+              phone: matches[0].phone ? `(${matches[0].phone})` : '',
+            });
+          } else if (matches.length === 2) {
+            alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}`;
+          } else {
+            alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}\n\n${t('customerNew.duplicateMaxButtonsNotice')}`;
+          }
+
+          const alertButtons: Array<{ text: string; onPress?: () => void }> = [];
+
+          if (matches.length === 1) {
             alertButtons.push({
-              text: t('customerNew.duplicateOpenNamedBtn', { name: m.name }),
+              text: t('customerNew.duplicateOpenExistingBtn'),
               onPress: () => {
                 isAlertOpenRef.current = false;
                 isSubmittingRef.current = false;
                 setIsSubmitting(false);
-                router.push(`/customer/${m.id}`);
+                router.push(`/customer/${matches[0].id}`);
               },
             });
-          });
-        }
+          } else {
+            // Show at most 2 named "open khata" buttons
+            matches.slice(0, 2).forEach((m) => {
+              alertButtons.push({
+                text: t('customerNew.duplicateOpenNamedBtn', { name: m.name }),
+                onPress: () => {
+                  isAlertOpenRef.current = false;
+                  isSubmittingRef.current = false;
+                  setIsSubmitting(false);
+                  router.push(`/customer/${m.id}`);
+                },
+              });
+            });
+          }
 
-        // Plus "Naya Banayein Phir Bhi" button
-        alertButtons.push({
-          text: t('customerNew.duplicateCreateAnywayBtn'),
-          onPress: () => {
-            isAlertOpenRef.current = false;
-            isSubmittingRef.current = false;
-            setIsSubmitting(false);
-            handleSave(true);
-          },
-        });
-
-        Alert.alert(
-          t('customerNew.duplicateAlertTitle'),
-          alertMessage,
-          alertButtons,
-          {
-            onDismiss: () => {
+          // Plus "Naya Banayein Phir Bhi" button
+          alertButtons.push({
+            text: t('customerNew.duplicateCreateAnywayBtn'),
+            onPress: () => {
               isAlertOpenRef.current = false;
               isSubmittingRef.current = false;
               setIsSubmitting(false);
+              handleSave(true);
             },
-          }
-        );
-        return;
+          });
+
+          Alert.alert(
+            t('customerNew.duplicateAlertTitle'),
+            alertMessage,
+            alertButtons,
+            {
+              onDismiss: () => {
+                isAlertOpenRef.current = false;
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
+              },
+            }
+          );
+          return;
+        }
       }
-    }
 
-    // Generate ONE operation / customer ID (random UUID) per intentional submit attempt
-    const operationCustomerId = generateUUID();
+      // Generate ONE operation / customer ID (random UUID) per intentional submit attempt
+      const operationCustomerId = generateUUID();
 
-    try {
       const openingPaise = openingBalance ? rupeesToPaise(openingBalance) : 0;
       const cleanPhone = phone.trim() ? (phone.startsWith('+91') ? phone : `+91 ${phone.trim()}`) : undefined;
 
