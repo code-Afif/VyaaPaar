@@ -171,6 +171,122 @@ export const supabaseService = {
   },
 
   /**
+   * Find possible duplicate customers for a merchant matching:
+   * 1. Trimmed case-insensitive name
+   * 2. Phone with the same last 10 digits
+   * Read-only query using existing supabase client (RLS applies).
+   * Returns id, name, phone, and current balance in paise.
+   */
+  async findPossibleDuplicates(
+    merchantId: string,
+    name: string,
+    phone?: string
+  ): Promise<{ id: string; name: string; phone?: string; currentBalancePaise: number }[]> {
+    if (!isSupabaseConfigured() || !merchantId) return [];
+
+    const trimmedName = name.trim();
+    const inputDigits = phone ? phone.replace(/\D/g, '').slice(-10) : '';
+
+    if (!trimmedName && !inputDigits) return [];
+
+    try {
+      const orParts: string[] = [];
+      if (trimmedName) {
+        orParts.push(`name.ilike."${trimmedName.replace(/"/g, '""')}"`);
+      }
+      if (inputDigits.length === 10) {
+        orParts.push(`phone.ilike."%${inputDigits}%"`);
+        orParts.push(`phone.ilike."%${inputDigits.slice(0, 5)}%${inputDigits.slice(5)}%"`);
+      }
+
+      let query = supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('merchant_id', merchantId);
+
+      if (orParts.length > 0) {
+        query = query.or(orParts.join(','));
+      }
+
+      const { data: dbCustomers, error: custError } = await query;
+
+      if (custError) {
+        console.warn('[supabaseService] findPossibleDuplicates query error:', custError.message);
+        return [];
+      }
+
+      if (!dbCustomers || dbCustomers.length === 0) {
+        return [];
+      }
+
+      // Filter in-memory to guarantee exact matching logic:
+      // Case-insensitive trimmed name OR exact last 10 digits of phone
+      const matched = dbCustomers.filter((c) => {
+        const cName = c.name?.trim().toLowerCase();
+        if (trimmedName && cName === trimmedName.toLowerCase()) return true;
+        if (inputDigits.length === 10 && c.phone) {
+          const cDigits = c.phone.replace(/\D/g, '').slice(-10);
+          if (cDigits && cDigits === inputDigits) return true;
+        }
+        return false;
+      });
+
+      if (matched.length === 0) return [];
+
+      // Deduplicate by customer id
+      const seen = new Set<string>();
+      const uniqueMatched: typeof matched = [];
+      for (const m of matched) {
+        if (!seen.has(m.id)) {
+          seen.add(m.id);
+          uniqueMatched.push(m);
+        }
+      }
+
+      // Fetch ledger entries to compute exact current balance in integer paise
+      const customerIds = uniqueMatched.map((c) => c.id);
+      const { data: entries, error: entriesError } = await supabase
+        .from('ledger_entries')
+        .select('customer_id, entry_type, amount_paise')
+        .eq('merchant_id', merchantId)
+        .in('customer_id', customerIds);
+
+      const balanceMap: Record<string, number> = {};
+      if (!entriesError && entries) {
+        entries.forEach((entry) => {
+          if (!entry.customer_id) return;
+          const amount = Number(entry.amount_paise) || 0;
+          if (!balanceMap[entry.customer_id]) {
+            balanceMap[entry.customer_id] = 0;
+          }
+          if (
+            entry.entry_type === 'credit_sale' ||
+            entry.entry_type === 'opening_balance' ||
+            entry.entry_type === 'adjustment_debit'
+          ) {
+            balanceMap[entry.customer_id] += amount;
+          } else if (
+            entry.entry_type === 'repayment' ||
+            entry.entry_type === 'adjustment_credit'
+          ) {
+            balanceMap[entry.customer_id] -= amount;
+          }
+        });
+      }
+
+      return uniqueMatched.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone || undefined,
+        currentBalancePaise: Math.max(0, balanceMap[c.id] || 0),
+      }));
+    } catch (err: any) {
+      console.warn('[supabaseService] findPossibleDuplicates exception:', err?.message || err);
+      return [];
+    }
+  },
+
+  /**
    * Fetch ledger entries
    */
   async getLedgerEntries(merchantId: string): Promise<LedgerEntry[]> {

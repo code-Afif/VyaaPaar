@@ -17,12 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '@/theme';
 import { useApp } from '@/context/AppContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabaseService } from '@/services/supabaseService';
 import { rupeesToPaise } from '@/utils/format';
 import { generateUUID } from '@/utils/uuid';
 
 export default function NewCustomerScreen() {
   const router = useRouter();
-  const { addCustomer, customers } = useApp();
+  const { addCustomer, customers, merchant } = useApp();
   const { t } = useLanguage();
 
   const [name, setName] = useState('');
@@ -45,35 +46,64 @@ export default function NewCustomerScreen() {
 
     // Pre-check existing customers for duplicate name or phone before proceeding
     if (!forceCreate) {
-      const cleanInputName = name.trim().toLowerCase();
-      const inputDigits = phone.replace(/\D/g, '').slice(-10);
+      let matches: Array<{ id: string; name: string; phone?: string; currentBalancePaise?: number }> = [];
 
-      const existingMatch = customers.find((c) => {
-        const cName = c.name.trim().toLowerCase();
-        if (cName === cleanInputName) return true;
-        if (inputDigits.length === 10 && c.phone) {
-          const cDigits = c.phone.replace(/\D/g, '').slice(-10);
-          if (cDigits && cDigits === inputDigits) return true;
+      // In real mode, query Supabase public.customers via read-only service method
+      if (!merchant.isDemoMode && merchant.id) {
+        try {
+          matches = await supabaseService.findPossibleDuplicates(merchant.id, name, phone);
+        } catch (err) {
+          console.warn('[customer/new] Duplicate check in Supabase failed, falling back to local list:', err);
+          matches = [];
         }
-        return false;
-      });
+      }
 
-      if (existingMatch) {
+      // In demo mode, or as fallback if the service call failed or returned empty:
+      if (matches.length === 0) {
+        const cleanInputName = name.trim().toLowerCase();
+        const inputDigits = phone.replace(/\D/g, '').slice(-10);
+
+        const localMatches = customers.filter((c) => {
+          const cName = c.name.trim().toLowerCase();
+          if (cleanInputName && cName === cleanInputName) return true;
+          if (inputDigits.length === 10 && c.phone) {
+            const cDigits = c.phone.replace(/\D/g, '').slice(-10);
+            if (cDigits && cDigits === inputDigits) return true;
+          }
+          return false;
+        });
+
+        if (localMatches.length > 0) {
+          matches = localMatches;
+        }
+      }
+
+      if (matches.length > 0) {
         if (isAlertOpenRef.current) return;
         isAlertOpenRef.current = true;
 
+        const displayedMatches = matches.slice(0, 3);
+        const matchLines = displayedMatches
+          .map((m) => `• ${m.name}${m.phone ? ` (${m.phone})` : ''}`)
+          .join('\n');
+
+        const alertMessage =
+          matches.length === 1
+            ? t('customerNew.duplicateAlertMsg', {
+                name: matches[0].name,
+                phone: matches[0].phone ? `(${matches[0].phone})` : '',
+              })
+            : `${matchLines}\n\n${t('customerNew.duplicateAlertTitle')}`;
+
         Alert.alert(
           t('customerNew.duplicateAlertTitle'),
-          t('customerNew.duplicateAlertMsg', {
-            name: existingMatch.name,
-            phone: existingMatch.phone ? `(${existingMatch.phone})` : '',
-          }),
+          alertMessage,
           [
             {
               text: t('customerNew.duplicateOpenExistingBtn'),
               onPress: () => {
                 isAlertOpenRef.current = false;
-                router.push(`/customer/${existingMatch.id}`);
+                router.push(`/customer/${displayedMatches[0].id}`);
               },
             },
             {
