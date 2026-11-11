@@ -131,6 +131,7 @@ export const en = {
     duplicateAlertMsg: '"{name}" {phone} is already registered in your Khata.',
     duplicateMultipleMsg: 'Multiple matching customer accounts found in your Khata:',
     duplicateMaxButtonsNotice: 'Note: Only the first 2 matching accounts can be opened directly from this prompt.',
+    duplicateNamePhoneError: 'A customer with this name and phone already exists. Please open the existing khata or use a different name or phone.',
     duplicateOpenExistingBtn: 'Open Existing Khata',
     duplicateOpenNamedBtn: 'Open: {name}',
     duplicateCreateAnywayBtn: 'Create New Anyway',

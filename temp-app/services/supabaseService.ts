@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { Customer, LedgerEntry, PaymentEvent, InventoryItem } from '@/types';
+import { Language, translate } from '@/i18n';
 
 export interface DbMerchant {
   id: string;
@@ -365,7 +366,8 @@ export const supabaseService = {
     name: string,
     phone?: string,
     openingBalancePaise: number = 0,
-    customerId?: string
+    customerId?: string,
+    language: Language = 'en'
   ): Promise<Customer | null> {
     if (!isSupabaseConfigured()) return null;
 
@@ -390,8 +392,54 @@ export const supabaseService = {
       .select()
       .single();
 
-    if (error || !newCust) {
-      throw new Error(`Failed to create customer: ${error?.message}`);
+    if (error) {
+      if (error.code === '23505') {
+        const isNamePhoneUnique =
+          Boolean(error.message?.includes('uq_customers_merchant_name_phone')) ||
+          Boolean(error.details?.includes('uq_customers_merchant_name_phone')) ||
+          (Boolean(error.details?.includes('name')) && Boolean(error.details?.includes('phone')));
+
+        if (isNamePhoneUnique) {
+          throw new Error(translate(language, 'customerNew.duplicateNamePhoneError'));
+        }
+
+        const isPrimaryKey =
+          Boolean(error.message?.includes('customers_pkey')) ||
+          Boolean(error.details?.includes('(id)=')) ||
+          (Boolean(customerId) && (Boolean(error.message?.includes(customerId!)) || Boolean(error.details?.includes(customerId!)))) ||
+          Boolean(customerId);
+
+        if (isPrimaryKey && customerId) {
+          console.warn(`[createCustomer] Primary key collision on customerId ${customerId} (idempotent duplicate). Fetching existing row.`);
+          const { data: existingCust, error: fetchErr } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', customerId)
+            .single();
+
+          if (fetchErr || !existingCust) {
+            throw new Error(`Failed to fetch existing customer on duplicate key: ${fetchErr?.message || error.message}`);
+          }
+
+          return {
+            id: existingCust.id,
+            name: existingCust.name,
+            phone: existingCust.phone || undefined,
+            openingBalancePaise,
+            currentBalancePaise: openingBalancePaise,
+            totalCreditPaise: openingBalancePaise,
+            totalRepaymentPaise: 0,
+            lastActivityDate: 'Just now',
+            createdAt: existingCust.created_at,
+          };
+        }
+      }
+
+      throw new Error(`Failed to create customer: ${error.message}`);
+    }
+
+    if (!newCust) {
+      throw new Error('Failed to create customer: No data returned from Supabase.');
     }
 
     // If opening balance > 0, insert opening_balance ledger entry

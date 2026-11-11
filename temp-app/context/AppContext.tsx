@@ -24,6 +24,8 @@ import {
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { supabaseService } from '@/services/supabaseService';
 import { isCreatedToday } from '@/utils/date';
+import { useLanguage } from '@/context/LanguageContext';
+import { translate } from '@/i18n';
 
 export interface MerchantProfile {
   id?: string;
@@ -86,6 +88,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { language } = useLanguage();
   const [isDemoMode, setIsDemoMode] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -291,20 +294,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     customId?: string
   ): Promise<Customer> => {
     if (!isDemoMode && merchant.id && isSupabaseConfigured()) {
-      const created = await supabaseService.createCustomer(
-        merchant.id,
-        name,
-        phone,
-        openingBalancePaise,
-        customId
-      );
-      if (created) {
-        setCustomers((prev) => {
-          if (prev.some((c) => c.id === created.id)) return prev;
-          return [created, ...prev];
-        });
-        await refreshFromSupabase();
-        return created;
+      try {
+        const created = await supabaseService.createCustomer(
+          merchant.id,
+          name,
+          phone,
+          openingBalancePaise,
+          customId,
+          language
+        );
+        if (created) {
+          setCustomers((prev) => {
+            if (prev.some((c) => c.id === created.id)) return prev;
+            return [created, ...prev];
+          });
+          await refreshFromSupabase();
+          return created;
+        }
+      } catch (err: any) {
+        if (
+          err?.message?.includes('uq_customers_merchant_name_phone') ||
+          err?.code === '23505'
+        ) {
+          throw new Error(translate(language, 'customerNew.duplicateNamePhoneError'));
+        }
+        throw err;
+      }
+    }
+
+    if (customId) {
+      const existing = customers.find((c) => c.id === customId);
+      if (existing) {
+        return existing;
       }
     }
 
