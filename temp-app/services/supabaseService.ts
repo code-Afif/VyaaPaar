@@ -101,6 +101,33 @@ export const supabaseService = {
   },
 
   /**
+   * Reusable mapping from DB customer row + balance totals to Customer object
+   */
+  mapDbCustomerToCustomer(
+    row: any,
+    balance: { balance: number; totalCredit: number; totalRepayment: number } = {
+      balance: 0,
+      totalCredit: 0,
+      totalRepayment: 0,
+    }
+  ): Customer {
+    return {
+      id: row.id,
+      name: row.name,
+      phone: row.phone || undefined,
+      openingBalancePaise: 0,
+      currentBalancePaise: Math.max(0, balance.balance || 0),
+      totalCreditPaise: balance.totalCredit || 0,
+      totalRepaymentPaise: balance.totalRepayment || 0,
+      lastActivityDate: new Date(row.updated_at || row.created_at).toLocaleDateString(
+        'en-IN',
+        { day: 'numeric', month: 'short' }
+      ),
+      createdAt: row.created_at,
+    };
+  },
+
+  /**
    * Fetch customers and calculate balances deterministically from ledger entries
    */
   async getCustomers(merchantId: string): Promise<Customer[]> {
@@ -155,20 +182,9 @@ export const supabaseService = {
       }
     });
 
-    return dbCustomers.map((c) => ({
-      id: c.id,
-      name: c.name,
-      phone: c.phone || undefined,
-      openingBalancePaise: 0,
-      currentBalancePaise: Math.max(0, balanceMap[c.id]?.balance || 0),
-      totalCreditPaise: balanceMap[c.id]?.totalCredit || 0,
-      totalRepaymentPaise: balanceMap[c.id]?.totalRepayment || 0,
-      lastActivityDate: new Date(c.updated_at || c.created_at).toLocaleDateString(
-        'en-IN',
-        { day: 'numeric', month: 'short' }
-      ),
-      createdAt: c.created_at,
-    }));
+    return dbCustomers.map((c) =>
+      this.mapDbCustomerToCustomer(c, balanceMap[c.id])
+    );
   },
 
   /**
@@ -405,9 +421,7 @@ export const supabaseService = {
 
         const isPrimaryKey =
           Boolean(error.message?.includes('customers_pkey')) ||
-          Boolean(error.details?.includes('(id)=')) ||
-          (Boolean(customerId) && (Boolean(error.message?.includes(customerId!)) || Boolean(error.details?.includes(customerId!)))) ||
-          Boolean(customerId);
+          Boolean(error.details?.includes('customers_pkey'));
 
         if (isPrimaryKey && customerId) {
           console.warn(`[createCustomer] Primary key collision on customerId ${customerId} (idempotent duplicate). Fetching existing row.`);
@@ -421,17 +435,35 @@ export const supabaseService = {
             throw new Error(`Failed to fetch existing customer on duplicate key: ${fetchErr?.message || error.message}`);
           }
 
-          return {
-            id: existingCust.id,
-            name: existingCust.name,
-            phone: existingCust.phone || undefined,
-            openingBalancePaise,
-            currentBalancePaise: openingBalancePaise,
-            totalCreditPaise: openingBalancePaise,
-            totalRepaymentPaise: 0,
-            lastActivityDate: 'Just now',
-            createdAt: existingCust.created_at,
-          };
+          // Fetch ledger entries to compute real balance fields
+          const { data: entries } = await supabase
+            .from('ledger_entries')
+            .select('entry_type, amount_paise')
+            .eq('customer_id', customerId);
+
+          let balance = 0;
+          let totalCredit = 0;
+          let totalRepayment = 0;
+
+          entries?.forEach((entry) => {
+            const amount = Number(entry.amount_paise);
+            if (
+              entry.entry_type === 'credit_sale' ||
+              entry.entry_type === 'opening_balance' ||
+              entry.entry_type === 'adjustment_debit'
+            ) {
+              balance += amount;
+              totalCredit += amount;
+            } else if (
+              entry.entry_type === 'repayment' ||
+              entry.entry_type === 'adjustment_credit'
+            ) {
+              balance -= amount;
+              totalRepayment += amount;
+            }
+          });
+
+          return this.mapDbCustomerToCustomer(existingCust, { balance, totalCredit, totalRepayment });
         }
       }
 

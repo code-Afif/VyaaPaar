@@ -132,16 +132,32 @@ export default function NewCustomerScreen() {
             });
           }
 
-          // Plus "Naya Banayein Phir Bhi" button
-          alertButtons.push({
-            text: t('customerNew.duplicateCreateAnywayBtn'),
-            onPress: () => {
-              isAlertOpenRef.current = false;
-              isSubmittingRef.current = false;
-              setIsSubmitting(false);
-              handleSave(true);
-            },
+          // Plus "Naya Banayein Phir Bhi" button only for name-only or phone-only matches
+          const cleanInputName = name.trim().toLowerCase();
+          const inputDigits = phone.replace(/\D/g, '').slice(-10);
+          const hasExactNameAndPhoneMatch = matches.some((m) => {
+            const mName = m.name.trim().toLowerCase();
+            const mPhoneDigits = (m.phone || '').replace(/\D/g, '').slice(-10);
+            return (
+              cleanInputName.length > 0 &&
+              mName === cleanInputName &&
+              inputDigits.length === 10 &&
+              mPhoneDigits.length === 10 &&
+              mPhoneDigits === inputDigits
+            );
           });
+
+          if (!hasExactNameAndPhoneMatch) {
+            alertButtons.push({
+              text: t('customerNew.duplicateCreateAnywayBtn'),
+              onPress: () => {
+                isAlertOpenRef.current = false;
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
+                handleSave(true);
+              },
+            });
+          }
 
           Alert.alert(
             t('customerNew.duplicateAlertTitle'),
