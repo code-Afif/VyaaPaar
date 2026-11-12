@@ -133,6 +133,7 @@ export const hinglish: typeof en = {
     duplicateAlertMsg: '"{name}" {phone} pehle se darj hai.',
     duplicateMultipleMsg: 'Aapke khate me ek se zyada milte-julte grahak mile:',
     duplicateMaxButtonsNotice: 'Note: Yahan se sirf pehle 2 khate direct khole ja sakte hain.',
+    duplicatePhoneMatchNotice: 'Yeh phone number pehle se darj hai. Kripya purana khata kholein ya dusra number use karein.',
     duplicateNamePhoneError: 'Is naam aur phone number ka grahak pehle se maujood hai. Kripya purana khata kholein ya alag naam ya phone use karein.',
     duplicateOpenExistingBtn: 'Existing Khata Kholein',
     duplicateOpenNamedBtn: 'Khata Kholein: {name}',

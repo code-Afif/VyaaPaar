@@ -105,7 +105,23 @@ export default function NewCustomerScreen() {
             alertMessage = `${t('customerNew.duplicateMultipleMsg')}\n\n${allMatchLines}\n\n${t('customerNew.duplicateMaxButtonsNotice')}`;
           }
 
-          const alertButtons: Array<{ text: string; onPress?: () => void }> = [];
+          const inputDigits = phone.replace(/\D/g, '').slice(-10);
+          const hasPhoneMatch =
+            inputDigits.length === 10 &&
+            matches.some((m) => {
+              const mDigits = (m.phone || '').replace(/\D/g, '').slice(-10);
+              return mDigits.length === 10 && mDigits === inputDigits;
+            });
+
+          if (hasPhoneMatch) {
+            alertMessage = `${alertMessage}\n\n${t('customerNew.duplicatePhoneMatchNotice')}`;
+          }
+
+          const alertButtons: Array<{
+            text: string;
+            style?: 'default' | 'cancel' | 'destructive';
+            onPress?: () => void;
+          }> = [];
 
           if (matches.length === 1) {
             alertButtons.push({
@@ -132,22 +148,19 @@ export default function NewCustomerScreen() {
             });
           }
 
-          // Plus "Naya Banayein Phir Bhi" button only for name-only or phone-only matches
-          const cleanInputName = name.trim().toLowerCase();
-          const inputDigits = phone.replace(/\D/g, '').slice(-10);
-          const hasExactNameAndPhoneMatch = matches.some((m) => {
-            const mName = m.name.trim().toLowerCase();
-            const mPhoneDigits = (m.phone || '').replace(/\D/g, '').slice(-10);
-            return (
-              cleanInputName.length > 0 &&
-              mName === cleanInputName &&
-              inputDigits.length === 10 &&
-              mPhoneDigits.length === 10 &&
-              mPhoneDigits === inputDigits
-            );
-          });
-
-          if (!hasExactNameAndPhoneMatch) {
+          if (hasPhoneMatch) {
+            // Show only the open-existing buttons (max 2 named plus a cancel)
+            alertButtons.push({
+              text: t('common.cancel'),
+              style: 'cancel',
+              onPress: () => {
+                isAlertOpenRef.current = false;
+                isSubmittingRef.current = false;
+                setIsSubmitting(false);
+              },
+            });
+          } else {
+            // Keep "Naya Banayein Phir Bhi" only when every match is name-only, with a different or empty phone
             alertButtons.push({
               text: t('customerNew.duplicateCreateAnywayBtn'),
               onPress: () => {
